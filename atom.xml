@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-02-29T14:11:26.248Z</updated>
+  <updated>2020-03-01T09:47:06.609Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -21,13 +21,21 @@
     <link href="http://yoursite.com/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"/>
     <id>http://yoursite.com/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</id>
     <published>2020-02-29T14:11:26.000Z</published>
-    <updated>2020-02-29T14:11:26.248Z</updated>
+    <updated>2020-03-01T09:47:06.609Z</updated>
     
     <summary type="html">
+    
+      &lt;p&gt;在上一篇文章中，笔者简单介绍了下&lt;a href=&quot;https://karthurl.github.io/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Java内存模型&lt;/a&gt;。本文承接上文，主要以代码+图片的形式呈现给大家，其主要目的是让大家对于并发程序中的内存可见性、原子性以及重排序有一定的了解。这三个问题也是并发程序为什么难写的原因。&lt;/p&gt;
     
     </summary>
     
     
+      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
   </entry>
   
