@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>
+    ThreadLocal解析 |  愿那颗星星一直指引你
+  </title>
+  <meta name="generator" content="hexo-theme-yilia-plus">
+  
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+<script src="/js/pace.min.js"></script>
+
+
+  
+
+  
+
+<link rel="alternate" href="/atom.xml" title="愿那颗星星一直指引你" type="application/atom+xml">
+</head>
+
+</html>
+
+<body>
+  <div id="app">
+    <main class="content">
+      <section class="outer">
+  <article id="post-ThreadLocal解析" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h1 class="article-title sea-center" style="border-left:0" itemprop="name">
+  ThreadLocal解析
+</h1>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/" class="article-date">
+  <time datetime="2020-02-11T14:34:40.000Z" itemprop="datePublished">2020-02-11</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+<div class="word_count">
+    <span class="post-time">
+        <span class="post-meta-item-icon">
+            <i class="ri-quill-pen-line"></i>
+            <span class="post-meta-item-text"> 字数统计:</span>
+            <span class="post-count">2.4k字</span>
+        </span>
+    </span>
+
+    <span class="post-time">
+        &nbsp; | &nbsp;
+        <span class="post-meta-item-icon">
+            <i class="ri-book-open-line"></i>
+            <span class="post-meta-item-text"> 阅读时长≈</span>
+            <span class="post-count">9分钟</span>
+        </span>
+    </span>
+</div>
+
+      
+    </div>
+    
+
+    
+    
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>在之前的几篇文章中，更多的讲的是线程之间的并发操作，多线程在读写共享变量时可能需要进行一些同步操作或者是将变量用volatile修饰等等。如果说每个线程都需要自己的独立实例，且该实例需要在多个方法中被使用（相同线程数据共享），又该如何去实现呢？在方法参数上定义这个共享的变量吗？显然这样子耦合太严重了，牵一发而动全身；那么使用一个全局的集合来共享数据？这又涉及到了多个线程之间的同步问题，只是为了能让线程间隔离数据而使用同步开销太大。</p>
+<p>ThreadLocal就是适用于这样的场景。本文从ThreadLocal的简单使用开始入手，通过源码来阐述其使用原理以及一些隐患。</p>
+<a id="more"></a>
+
+<h1 id="ThreadLocal简介"><a href="#ThreadLocal简介" class="headerlink" title="ThreadLocal简介"></a>ThreadLocal简介</h1><p>ThreadLocal是JDK包提供的一种工具，我们可以从名字这里看到，它能够提供线程的本地变量，每次线程读写变量时，都是读写的本地变量，这就实现了一个线程之间变量的隔离。</p>
+<h1 id="ThreadLocal的简单使用"><a href="#ThreadLocal的简单使用" class="headerlink" title="ThreadLocal的简单使用"></a>ThreadLocal的简单使用</h1><p>这边给出一段代码，来帮助我们直观的了解ThreadLocal是如何使用的：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">public class TL &#123;</span><br><span class="line"></span><br><span class="line">    private static ThreadLocal&lt;String&gt; threadLocal&#x3D;new ThreadLocal&lt;&gt;();</span><br><span class="line"></span><br><span class="line">    private static void print()&#123;</span><br><span class="line">        &#x2F;&#x2F;打印线程名称以及该线程对应的本地变量</span><br><span class="line">        System.out.println(Thread.currentThread().getName()+&quot;: &quot;+threadLocal.get()); </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public static void main(String[] args) &#123;</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            threadLocal.set(&quot;这是副线程&quot;); &#x2F;&#x2F;副线程设置ThreadLocal</span><br><span class="line">            print();</span><br><span class="line">        &#125;).start();</span><br><span class="line">        threadLocal.set(&quot;这是main线程&quot;);  &#x2F;&#x2F;主线程设置ThreadLoacl</span><br><span class="line">        print();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这是运行结果：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">main: 这是main线程</span><br><span class="line">Thread-0: 这是副线程</span><br></pre></td></tr></table></figure>
+<p>在上面的例子中，一共两个线程，主线程和副线程。在每个线程内部设置了本地变量的值，然后调用print方法打印当前线程名和本地变量的值，可以发现即使是一个ThreadLocal变量，不同的线程从中获取的值是不同的。</p>
+<h1 id="ThreadLocal的实现原理"><a href="#ThreadLocal的实现原理" class="headerlink" title="ThreadLocal的实现原理"></a>ThreadLocal的实现原理</h1><p>在分析ThreadLocal的源码之前，或许从宏观上了解一下本地变量是如何储存的比较好，这样到时候去看源码的时候就不会一脸懵逼（我当时就是这样的）。我把ThreadLocal的储存原理抽象一下，请看下面这张图：</p>
+<p><img src="https://i.loli.net/2020/03/02/eO2NctRIHMrnwFm.jpg" alt="ThreadLocal.jpg"></p>
+<p>我们把ThreadLocal当作一张一卡通，可以开启所有的储物柜对应id的格子。比如图中的ThreadLocal一卡通可以打开所有储物柜的1号格子。但是不同的储物柜里，放着不同的东西，比如：饮料、食物等。我们即使使用相同的卡去开格子，不同的储物柜得到的东西也是不同的。我们得到的一定是上次往这个储物柜里放的东西。</p>
+<p>再结合上一节里的代码，我们可以思考一段时间再往下看。</p>
+<p>不同的线程设置本地变量，就像我们拿着卡在不同的储物柜存放东西；下次对应线程取出本地变量时，就像拿着卡去对应的储物柜获取东西。这样理解起来，或许会更方便一些，线程与ThreadLocal存在着这样一种对应关系。那么问题来了，线程是怎么储存本地变量的？或者说，线程是怎么提供类似于储物柜这样子的功能的。我们来看看Thread(注意不是ThreadLocal)的源码：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">&#x2F;* ThreadLocal values pertaining to this thread. This map is maintained</span><br><span class="line"> * by the ThreadLocal class. *&#x2F;</span><br><span class="line">ThreadLocal.ThreadLocalMap threadLocals &#x3D; null;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以看到Thread中有这样一个属性，叫做ThreadLocalMap，初始化的时候是null，它是属于ThreadLocal内部的一个类，就是这个Map实现了类似于储物箱的功能。现在翻开ThreadLocal的源码，看看这个内部类是怎么回事（源码有点长，我做了简略）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">static class ThreadLocalMap &#123;</span><br><span class="line"></span><br><span class="line">       &#x2F;&#x2F;Entry为ThreadLocalMap静态内部类，对ThreadLocal的弱引用</span><br><span class="line">       &#x2F;&#x2F;同时让ThreadLocal和储值形成key-value的关系</span><br><span class="line">       static class Entry extends WeakReference&lt;ThreadLocal&lt;?&gt;&gt; &#123;</span><br><span class="line">           </span><br><span class="line">           Object value;</span><br><span class="line"></span><br><span class="line">           Entry(ThreadLocal&lt;?&gt; k, Object v) &#123;</span><br><span class="line">               super(k);</span><br><span class="line">               value &#x3D; v;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br><span class="line"></span><br><span class="line">       private static final int INITIAL_CAPACITY &#x3D; 16;</span><br><span class="line"></span><br><span class="line">       private Entry[] table;</span><br><span class="line"></span><br><span class="line">       private int size &#x3D; 0;</span><br><span class="line"></span><br><span class="line">       private int threshold; &#x2F;&#x2F; Default to 0</span><br><span class="line"></span><br><span class="line">       省略号……</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过这段代码我们不难发现，ThreadLocalMap很像HashMap（hash冲突的处理不同），内部是一个Entry数组，用于存放ThreadLocal-Value的。一切的存放/读取操作都是通过这个Entry数组来实现的。<strong>值得注意的是</strong>，这个Entry类型对ThreadLocal也就是Key是一个弱引用，这点下文会提到。</p>
+<p>到了这里，应当可以知道，每个线程是如何存放本地变量的了：每个线程Thread持有一个ThreadLocalMap类型的实例threadLocals，在存放的时候，以ThreadLocal为Key来存取Value到线程私有的ThreadLocalMap中去；获取的时候也是以ThreadLocal为Key到自己线程持有的ThreadLocalMap中去拿。这也解释了为什么相同的ThreadLocal会取得不同的实例对象，因为存放容器的对象是不同的。大家可以再仔细思考下～</p>
+<p>我们再来看看ThreadLocal比较重要的两个方法，即set（），get（）的底层实现。</p>
+<p>首先是set（）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">public void set(T value) &#123;</span><br><span class="line">       Thread t &#x3D; Thread.currentThread(); &#x2F;&#x2F;获取当前线程</span><br><span class="line">       ThreadLocalMap map &#x3D; getMap(t);    &#x2F;&#x2F;获取当前线程所持有的ThreadLocalMap</span><br><span class="line">       if (map !&#x3D; null) &#123;                 &#x2F;&#x2F;如果ThreadLocalMap不为空，存入自己和value</span><br><span class="line">           map.set(this, value);</span><br><span class="line">       &#125; else &#123;</span><br><span class="line">           createMap(t, value);           &#x2F;&#x2F;否则给当前线程新建一个ThreadLocalMap，并存入value</span><br><span class="line">       &#125;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<p>set方法比较简单，可以直接看注释，接下来是get（）：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">public T get() &#123;</span><br><span class="line">    Thread t &#x3D; Thread.currentThread(); &#x2F;&#x2F;获取当前线程</span><br><span class="line">    ThreadLocalMap map &#x3D; getMap(t);    &#x2F;&#x2F;获取当前线程所持有的ThreadLocalMap</span><br><span class="line">    if (map !&#x3D; null) &#123;                 &#x2F;&#x2F;如果map不为空则根据自己来获取Entry</span><br><span class="line">        ThreadLocalMap.Entry e &#x3D; map.getEntry(this);</span><br><span class="line">        if (e !&#x3D; null) &#123;               &#x2F;&#x2F;如果Entry不为空则根返回Entry中的value</span><br><span class="line">            @SuppressWarnings(&quot;unchecked&quot;)</span><br><span class="line">            T result &#x3D; (T)e.value;</span><br><span class="line">            return result;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return setInitialValue();        &#x2F;&#x2F;如果没有map或者找不到对应的Entry 调用setInitialValue()并返回</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">private T setInitialValue() &#123;</span><br><span class="line">    T value &#x3D; initialValue();         &#x2F;&#x2F;就是null</span><br><span class="line">    Thread t &#x3D; Thread.currentThread();</span><br><span class="line">    ThreadLocalMap map &#x3D; getMap(t);</span><br><span class="line">    if (map !&#x3D; null) &#123;               &#x2F;&#x2F;map存在则插入自己和null，也就是说Entry可以允许值为null</span><br><span class="line">        map.set(this, value);</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        createMap(t, value);         &#x2F;&#x2F;否则创建map并插入</span><br><span class="line">    &#125;</span><br><span class="line">    if (this instanceof TerminatingThreadLocal) &#123;</span><br><span class="line">        TerminatingThreadLocal.register((TerminatingThreadLocal&lt;?&gt;) this);</span><br><span class="line">    &#125;</span><br><span class="line">    return value;      &#x2F;&#x2F;返回null</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>get（）方法也不难。。注释写的应该挺清楚了。当然还有个比较重要的remove方法，记得使用完ThreadLocal后调用（划重点！！）</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">public void remove() &#123;</span><br><span class="line">         ThreadLocalMap m &#x3D; getMap(Thread.currentThread());</span><br><span class="line">         if (m !&#x3D; null) &#123;</span><br><span class="line">             m.remove(this);</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br></pre></td></tr></table></figure>
+<p>remove方法主要就是在使用完ThreadLocal后，释放一些资源，以免造成内存泄漏，代码也不难～</p>
+<h1 id="内存泄漏的隐患"><a href="#内存泄漏的隐患" class="headerlink" title="内存泄漏的隐患"></a>内存泄漏的隐患</h1><p>ThreadLocal使用起来虽然很方便，但是用的不恰当的也会有风险，比如内存泄漏。所谓内存泄漏，是指程序中己动态分配的堆内存由于某种原因程序未释放或无法释放，造成系统内存的浪费，导致程序运行速度减慢甚至系统崩溃等严重后果。更直白一点，这个对象我们以后我们都用不到了，但是他还没有被垃圾回收掉。</p>
+<p>之前在说ThreadLocalMap中的Entry时，注意到Entry对ThreadLocal是弱引用。如果看过《深入理解Java虚拟机》的读者可能会在知道，如果一个对象只具有弱引用，那么这个对象就会被垃圾回收器GC掉(被弱引用所引用的对象只能生存到下一次GC之前，当发生GC时候，无论当前内存是否足够，弱引用所引用的对象都会被回收掉)。</p>
+<p>我们结合下面这张图来看看ThreadLocal内存泄漏是怎么产生的：</p>
+<p><img src="https://i.loli.net/2020/03/02/4WNC2IznovdTguj.jpg" alt="tl2.jpg"></p>
+<p>根据这张引用关系图我们可以看到，当虚拟机栈中的ThreadLocal引用失效后，由于Entry对ThreadLocal是弱引用，所以在垃圾回收的时候，可以回收掉ThreadLocal，此时Map中会存在Key为null但是Value不为null的Entry。如果线程一直不结束（比如使用了线程池），此时会存在一条强引用链：虚拟机栈中的Thread引用-&gt;Thread对象-&gt;ThreadLocalMap-&gt;Entry-&gt;Object对象。尽管这个Object对象我们不再使用，但是只要线程还在或者不采取其他措施，这个对象是无法回收的，这也就造成了内存泄漏。</p>
+<p>当然ThreadLocal并非没有预防措施，其思路在于把Key为null的Entry中，指向Object的强引用给掐掉，就可以了。事实上，在ThreadLocalMap中，每次新增、移除、获取的时候都会去擦除Key为Null的Value，但是这些措施并不能保证一定不会内存泄露,比如:使用了static修饰的ThreadLocal，延长了ThreadLocal的生命周期,可能会导致内存泄露；分配使用了ThreadLocal又不再调用get、set或者remove方法也会导致内存泄露等等。</p>
+<p>所以为了避免内存的泄露,每次使用完 ThreadLocal 的时候都需要调用 remove() 方法来擦除数据。</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>总的来说ThreadLocal以其巧妙的设计，实现了多线程环境下变量隔离的功能，在使用的时候我们还是需要养成用完过后remove的好习惯～</p>
+
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+        <div class="declare">
+          <ul class="post-copyright">
+            <li>
+              <i class="ri-copyright-line"></i>
+              <strong>版权声明： </strong s>
+              本博客所有文章除特别声明外，均采用 <a href="https://www.apache.org/licenses/LICENSE-2.0.html" rel="external nofollow"
+                target="_blank">Apache License 2.0</a> 许可协议。转载请注明出处！
+            </li>
+          </ul>
+        </div>
+        
+    <footer class="article-footer">
+      
+          
+<div class="share-btn">
+      <span class="share-sns share-outer">
+        <i class="ri-share-forward-line"></i>
+        分享
+      </span>
+      <div class="share-wrap">
+        <i class="arrow"></i>
+        <div class="share-icons">
+          
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="ri-weibo-fill"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="ri-wechat-fill"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="ri-qq-fill"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="ri-douban-line"></i>
+          </a>
+          <!-- <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a> -->
+          
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="ri-facebook-circle-fill"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="ri-twitter-fill"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="ri-google-fill"></i>
+          </a>
+        </div>
+      </div>
+</div>
+
+<div class="wx-share-modal">
+    <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://yoursite.com/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div id="share-mask"></div>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+  
+  <nav class="article-nav">
+    
+      <a href="/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/" class="article-nav-link">
+        <strong class="article-nav-caption">上一篇</strong>
+        <div class="article-nav-title">
+          
+            为什么阿里巴巴手册中禁用默认实现的线程池
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/" class="article-nav-link">
+        <strong class="article-nav-caption">下一篇</strong>
+        <div class="article-nav-title">Java中的原子基本类型类</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+  
+<!-- valine评论 -->
+<div id="vcomments-box">
+    <div id="vcomments">
+    </div>
+</div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        app_id: '',
+        app_key: '',
+        path: window.location.pathname,
+        notify: 'false',
+        verify: 'false',
+        avatar: 'mp',
+        placeholder: '给我的文章加点评论吧~',
+        recordIP: true
+    });
+    const infoEle = document.querySelector('#vcomments .info');
+    if (infoEle && infoEle.childNodes && infoEle.childNodes.length > 0) {
+        infoEle.childNodes.forEach(function (item) {
+            item.parentNode.removeChild(item);
+        });
+    }
+</script>
+<style>
+    #vcomments-box {
+        padding: 5px 30px;
+    }
+
+    @media screen and (max-width: 800px) {
+        #vcomments-box {
+            padding: 5px 0px;
+        }
+    }
+
+    #vcomments-box #vcomments {
+        background-color: #fff;
+    }
+
+    .v .vlist .vcard .vh {
+        padding-right: 20px;
+    }
+
+    .v .vlist .vcard {
+        padding-left: 10px;
+    }
+</style>
+
+  
+
+  
+  
+  
+
+</article>
+</section>
+      <footer class="footer">
+  <div class="outer">
+    <ul class="list-inline">
+      <li>
+        &copy;
+        2020
+        Karthur
+      </li>
+      <li>
+        
+      </li>
+    </ul>
+    <ul class="list-inline">
+      <li>
+        
+        
+        <span>
+  <i>PV:<span id="busuanzi_value_page_pv"></span></i>
+  <i>UV:<span id="busuanzi_value_site_uv"></span></i>
+</span>
+        
+      </li>
+      
+      <li>
+        <!-- cnzz统计 -->
+        
+        <script type="text/javascript" src='https://s9.cnzz.com/z_stat.php?id=1278069914&amp;web_id=1278069914'></script>
+        
+      </li>
+    </ul>
+  </div>
+</footer>
+      <div class="to_top">
+        <div class="totop" id="totop">
+  <i class="ri-arrow-up-line"></i>
+</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+  <div class="logo">
+    <a href="/"><img src="/images/ayer-side.svg" alt="愿那颗星星一直指引你"></a>
+  </div>
+  
+  <ul class="nav nav-main">
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/">主页</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/archives">归档</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/categories">分类</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/tags">标签</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/about">关于我</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="https://github.com/KArthurL" target="_blank" rel="noopener">github</a>
+    </li>
+    
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      
+      <a class="nav-item-link nav-item-search"  title="Search">
+        <i class="ri-search-line"></i>
+      </a>
+      
+      
+      <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+        <i class="ri-rss-line"></i>
+      </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+    </aside>
+    <div id="mask"></div>
+
+<!-- #reward -->
+<div id="reward">
+  <span class="close"><i class="ri-close-line"></i></span>
+  <p class="reward-p"><i class="ri-cup-line"></i>请我喝杯咖啡吧~</p>
+  <div class="reward-box">
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/alipay.jpg">
+      <span class="reward-type">支付宝</span>
+    </div>
+    
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/wechat.jpg">
+      <span class="reward-type">微信</span>
+    </div>
+    
+  </div>
+</div>
+    
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+<script src="/js/share.js"></script>
+
+
+
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script>
+  try {
+    var typed = new Typed("#subtitle", {
+    strings: ['一闪一闪亮晶晶','满天都是小星星','海上生明月，天涯共此时'],
+    startDelay: 0,
+    typeSpeed: 200,
+    loop: true,
+    backSpeed: 100,
+    showCursor: true
+    });
+  } catch (err) {
+  }
+  
+</script>
+
+
+
+
+<script src="/js/tocbot.min.js"></script>
+
+<script>
+  // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+  tocbot.init({
+    tocSelector: '.tocbot',
+    contentSelector: '.article-entry',
+    headingSelector: 'h1, h2, h3, h4, h5, h6',
+    hasInnerContainers: true,
+    scrollSmooth: true,
+    scrollContainer:'main',
+    positionFixedSelector: '.tocbot',
+    positionFixedClass: 'is-position-fixed',
+    fixedSidebarOffset: 'auto',
+    onClick: (e) => {
+      $('.toc-link').removeClass('is-active-link');
+      $(`a[href=${e.target.hash}]`).addClass('is-active-link');
+      $(e.target.hash).scrollIntoView();
+      return false;
+    }
+  });
+</script>
+
+
+<script>
+  var ayerConfig = {
+    mathjax: false
+  }
+</script>
+
+
+<script src="/js/ayer.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.css">
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" style="display:none" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css">
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"></script>
+
+<script>
+    function viewer_init() {
+        let pswpElement = document.querySelectorAll('.pswp')[0];
+        let $imgArr = document.querySelectorAll(('.article-entry img:not(.reward-img)'))
+
+        $imgArr.forEach(($em, i) => {
+            $em.onclick = () => {
+                // slider展开状态
+                // todo: 这样不好，后面改成状态
+                if (document.querySelector('.left-col.show')) return
+                let items = []
+                $imgArr.forEach(($em2, i2) => {
+                    let img = $em2.getAttribute('data-idx', i2)
+                    let src = $em2.getAttribute('data-target') || $em2.getAttribute('src')
+                    let title = $em2.getAttribute('alt')
+                    // 获得原图尺寸
+                    const image = new Image()
+                    image.src = src
+                    items.push({
+                        src: src,
+                        w: image.width || $em2.width,
+                        h: image.height || $em2.height,
+                        title: title
+                    })
+                })
+                var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, {
+                    index: parseInt(i)
+                });
+                gallery.init()
+            }
+        })
+    }
+    viewer_init()
+</script>
+
+
+
+
+<script type="text/javascript" src="https://js.users.51.la/20544303.js"></script>
+
+    
+  </div>
+</body>
+
+</html>

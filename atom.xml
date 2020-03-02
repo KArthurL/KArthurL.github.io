@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-01T09:56:27.241Z</updated>
+  <updated>2020-03-02T15:18:38.332Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -17,11 +17,136 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
+    <title>为什么阿里巴巴手册中禁用默认实现的线程池</title>
+    <link href="http://yoursite.com/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/"/>
+    <id>http://yoursite.com/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/</id>
+    <published>2020-02-12T14:38:30.000Z</published>
+    <updated>2020-03-02T15:18:38.332Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在阿里巴巴Java开发手册中有一条规则：【强制】线程池不允许使用Executors去创建，而是通过ThreadPoolExecutor的方式，这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。&lt;/p&gt;
+&lt;p&gt;如何去理解这句话？&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="规范" scheme="http://yoursite.com/categories/%E8%A7%84%E8%8C%83/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="规范" scheme="http://yoursite.com/tags/%E8%A7%84%E8%8C%83/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>ThreadLocal解析</title>
+    <link href="http://yoursite.com/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/"/>
+    <id>http://yoursite.com/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/</id>
+    <published>2020-02-11T14:34:40.000Z</published>
+    <updated>2020-03-02T15:18:27.779Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在之前的几篇文章中，更多的讲的是线程之间的并发操作，多线程在读写共享变量时可能需要进行一些同步操作或者是将变量用volatile修饰等等。如果说每个线程都需要自己的独立实例，且该实例需要在多个方法中被使用（相同线程数据共享），又该如何去实现呢？在方法参数上定义这个共享的变量吗？显然这样子耦合太严重了，牵一发而动全身；那么使用一个全局的集合来共享数据？这又涉及到了多个线程之间的同步问题，只是为了能让线程间隔离数据而使用同步开销太大。&lt;/p&gt;
+&lt;p&gt;ThreadLocal就是适用于这样的场景。本文从ThreadLocal的简单使用开始入手，通过源码来阐述其使用原理以及一些隐患。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>Java中的原子基本类型类</title>
+    <link href="http://yoursite.com/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/"/>
+    <id>http://yoursite.com/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/</id>
+    <published>2020-02-09T14:34:18.000Z</published>
+    <updated>2020-03-02T15:17:01.661Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Java从JDK1.5开始提供了java.util.concurrent.atomic包，这个包中当原子操作类提供了一种用法简单、性能高效、线程安全地更新一个变量的方式。变量的类型有很多，所以Atomic包下一共提供了13个类。本文主要以AtomicInteger为例，以小见大，对它的源码进行剖析，来明白原子类的实现原理。&lt;br&gt;阅读本文前，最好对volatile和CAS有一定了解，这方面可以请看上一篇文章。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>volatile和CAS</title>
+    <link href="http://yoursite.com/2020/02/08/volatile%E5%92%8CCAS/"/>
+    <id>http://yoursite.com/2020/02/08/volatile%E5%92%8CCAS/</id>
+    <published>2020-02-08T13:51:50.000Z</published>
+    <updated>2020-03-02T15:17:07.980Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在讲Java并发编程的时候，volatile关键字和CAS操作都扮演着重要的角色。本文之所以把这两个放在一起讲，是因为两者的有机结合能实现锁的功能。volatile能保证内存可见性和防止重排序，CAS能保证操作的原子性（其实也能保证可见性），两者结合几乎拓展出了整个Java的并发包，Java中Lock的底层实现AQS所依赖的也正是volatile和CAS。&lt;/p&gt;
+&lt;p&gt;话不多说，现在让我们一起揭开它们的神秘面纱吧～&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>synchronized的原理和使用</title>
+    <link href="http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/"/>
+    <id>http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/</id>
+    <published>2020-02-05T10:13:54.000Z</published>
+    <updated>2020-03-02T15:17:12.982Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。&lt;/p&gt;
+&lt;p&gt;本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
+    
+    
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+  </entry>
+  
+  <entry>
     <title>内存可见性、原子性和重排序</title>
-    <link href="http://yoursite.com/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"/>
-    <id>http://yoursite.com/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</id>
-    <published>2020-02-29T14:11:26.000Z</published>
-    <updated>2020-03-01T09:56:27.241Z</updated>
+    <link href="http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"/>
+    <id>http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</id>
+    <published>2020-02-03T14:11:26.000Z</published>
+    <updated>2020-03-02T15:17:19.137Z</updated>
     
     <summary type="html">
     
@@ -41,10 +166,10 @@
   
   <entry>
     <title>Java内存模型</title>
-    <link href="http://yoursite.com/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/"/>
-    <id>http://yoursite.com/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/</id>
-    <published>2020-02-29T10:29:40.000Z</published>
-    <updated>2020-02-29T14:08:35.579Z</updated>
+    <link href="http://yoursite.com/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/"/>
+    <id>http://yoursite.com/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/</id>
+    <published>2020-02-02T10:29:40.000Z</published>
+    <updated>2020-03-02T15:17:25.290Z</updated>
     
     <summary type="html">
     
@@ -60,29 +185,6 @@
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
     
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>Hello World</title>
-    <link href="http://yoursite.com/2020/02/28/hello-world/"/>
-    <id>http://yoursite.com/2020/02/28/hello-world/</id>
-    <published>2020-02-28T12:50:46.705Z</published>
-    <updated>2020-02-28T12:50:46.706Z</updated>
-    
-    <summary type="html">
-    
-      
-      
-        
-        
-          &lt;p&gt;Welcome to &lt;a href=&quot;https://hexo.io/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Hexo&lt;/a&gt;! This is your very first post. Check &lt;a
-        
-      
-    
-    </summary>
-    
-    
     
   </entry>
   

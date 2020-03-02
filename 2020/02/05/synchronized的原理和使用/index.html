@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>
+    synchronized的原理和使用 |  愿那颗星星一直指引你
+  </title>
+  <meta name="generator" content="hexo-theme-yilia-plus">
+  
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+<script src="/js/pace.min.js"></script>
+
+
+  
+
+  
+
+<link rel="alternate" href="/atom.xml" title="愿那颗星星一直指引你" type="application/atom+xml">
+</head>
+
+</html>
+
+<body>
+  <div id="app">
+    <main class="content">
+      <section class="outer">
+  <article id="post-synchronized的原理和使用" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h1 class="article-title sea-center" style="border-left:0" itemprop="name">
+  synchronized的原理和使用
+</h1>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/" class="article-date">
+  <time datetime="2020-02-05T10:13:54.000Z" itemprop="datePublished">2020-02-05</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+<div class="word_count">
+    <span class="post-time">
+        <span class="post-meta-item-icon">
+            <i class="ri-quill-pen-line"></i>
+            <span class="post-meta-item-text"> 字数统计:</span>
+            <span class="post-count">3.7k字</span>
+        </span>
+    </span>
+
+    <span class="post-time">
+        &nbsp; | &nbsp;
+        <span class="post-meta-item-icon">
+            <i class="ri-book-open-line"></i>
+            <span class="post-meta-item-text"> 阅读时长≈</span>
+            <span class="post-count">13分钟</span>
+        </span>
+    </span>
+</div>
+
+      
+    </div>
+    
+
+    
+    
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。</p>
+<p>本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。</p>
+<a id="more"></a>
+
+<h1 id="Java中的锁机制"><a href="#Java中的锁机制" class="headerlink" title="Java中的锁机制"></a>Java中的锁机制</h1><p>Java中的锁有很多，按照功能、种类进行分类，主要包括以下几种：</p>
+<ol>
+<li>从线程是否需要对资源加锁可以分为 <strong>悲观锁</strong> 和 <strong>乐观锁</strong>。</li>
+<li>从锁的公平性进行区分，可以分为 <strong>公平锁</strong> 和 <strong>非公平锁</strong>。</li>
+<li>从根据锁是否重复获取可以分为 可 <strong>重入锁</strong> 和 <strong>不可重入锁</strong>。</li>
+<li>从那个多个线程能否获取同一把锁分为 <strong>共享锁</strong> 和 <strong>排他锁</strong>。</li>
+</ol>
+<p>而Java中的锁的具体实现主要有JVM提供的关键字synchronized和Java并发包下的Lock。</p>
+<p>本文中介绍的synchronized如果按照上面的分类的话，应当属于 <strong>悲观锁、非公平锁、重入锁、排他锁</strong>。</p>
+<h1 id="synchronized如何使用"><a href="#synchronized如何使用" class="headerlink" title="synchronized如何使用"></a>synchronized如何使用</h1><p>首先，我们来看看synchronized如何使用的。synchronized实现同步的基础是：Java中的每一个对象都可以作为锁。在使用的时候，主要有以下几种使用方式：</p>
+<ol>
+<li>修饰实例方法，作用于当前对象实例加锁，进入同步代码前要获得当前对象实例的锁</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">public synchronized void xxx()&#123;</span><br><span class="line">        &#x2F;&#x2F;省略号</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li>修饰静态方法，作用于当前类对象加锁，进入同步代码前要获得当前类对象的锁 </li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">public static synchronized void xxx()&#123;</span><br><span class="line">        &#x2F;&#x2F;省略号</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li>修饰代码块，指定加锁对象，对给定对象加锁，进入同步代码块前要获得给定对象的锁</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">Object lock&#x3D;new Object();</span><br><span class="line"></span><br><span class="line">synchronized (lock)&#123;</span><br><span class="line">    &#x2F;&#x2F;省略号</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当一个线程试图访问同步代码块或者同步方法时，它必须先得到锁，退出或者抛出异常时必须释放锁。</p>
+<p>现在我们从三大问题的角度来看，结合Java内存模型，看看synchronized是如何解决的：</p>
+<ul>
+<li><p>内存可见性：在进入同步代码块或者同步方法时，线程需要获取锁，JMM会把线程对应的工作内存置为无效。从而使得后续的共享变量必须从主内存中读取；在锁释放的时候，JMM会把线程对应的本地内存中的共享变量刷新到主内存中去。由于synchronized是排他锁，同一时刻，只有一个相关线程可以拿到对象上的锁，所以当每个线程执行时都会得到最新的变量，而执行完成后都会刷新主内存，因此能保证内存的可见性。</p>
+</li>
+<li><p>原子性：同步代码块或者同步方法的原子性并不是严格意义上的不可分割，事实上，在同步代码执行的过程中，也有可能被其他不相关的线程抢占。但是其他线程的运行结果并不影响持有锁的线程（如果有影响就要检查一下是否正确加锁了。。。）。同步代码原子性的保证，来自于其排他锁的性质。</p>
+</li>
+<li><p>重排序：同步代码块或者同步方法能够保证同步区域中的代码不跑到临界区外，<strong>但是不能保证同步区域内的代码不发生重排序（划重点！！）</strong>，如果说同步区域内的代码重排序，不影响后续线程的执行结果，那还好。但一旦出现这种情况，那么隐患还是相当大的，比如说单例模式的双重检查锁，需要靠volatile来修饰变量防止重排序。</p>
+</li>
+</ul>
+<h1 id="Mark-Word"><a href="#Mark-Word" class="headerlink" title="Mark Word"></a>Mark Word</h1><p>之前说了很久的锁，那么Java中的对象锁是如何实现的？或者说，锁到底存放在哪里？</p>
+<p>在《深入理解Java虚拟机一书中》，我们可以知道，对象在内存中的布局分为三块区域：对象头、实例数据和对齐填充。Hotspot虚拟机的对象头主要包括两部分数据：Mark Word（标记字段）、Klass Pointer（类型指针），数组会多1字宽(32位: 4字节)来存储数组长度。</p>
+<p>synchronized用到的锁就是存在Java对象头当中的。其中Klass Point是对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是哪个类的实例；Mark Word用于存储对象自身的运行时数据，它是实现轻量级锁和偏向锁的关键。</p>
+<p>Mark Word主要用来存储对象自身的运行时数据，如hashcode、gc分代年龄、锁状态标志、线程持有的锁、偏向线程 ID、偏向时间戳等等。mark word的位长度为JVM的一个Word大小，也就是说32位JVM的Mark word为32位，64位JVM为64位。在运行期间，Mark Word里存储的数据会随着锁标志位的变化而变化。我们来看看它具体的结构和状态变化（以32位虚拟机为例）：</p>
+<table>
+<thead>
+<tr>
+<th align="center">锁状态</th>
+<th align="center">30bit</th>
+<th align="center">2bit锁标志位</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">无锁状态</td>
+<td align="center">对象的hashCode:25bit 对象分代年龄:4bit 是否是偏向锁:0</td>
+<td align="center">01</td>
+</tr>
+<tr>
+<td align="center">轻量级锁</td>
+<td align="center">指向栈中锁记录的指针</td>
+<td align="center">00</td>
+</tr>
+<tr>
+<td align="center">重量级锁</td>
+<td align="center">指向互斥量的指针</td>
+<td align="center">10</td>
+</tr>
+<tr>
+<td align="center">GC标记</td>
+<td align="center">空</td>
+<td align="center">11</td>
+</tr>
+<tr>
+<td align="center">偏向锁</td>
+<td align="center">线程ID:23bit 时间戳:2bit 对象分代年龄:4bit 是否是偏向锁:1</td>
+<td align="center">01</td>
+</tr>
+</tbody></table>
+<h1 id="Monitor机制"><a href="#Monitor机制" class="headerlink" title="Monitor机制"></a>Monitor机制</h1><p>在了解了锁的概念后，Java中又是如何实现同步获取锁的呢？这不得不提到Monitor机制，Monitor其实是一种同步工具、同步机制，在Java中，Object 类本身就是监视者对象，Java 对于 Monitor Object 模式做了内建的支持，即每一个Java对象是天生的Monitor，每一个Java对象都有成为Monitor的潜质。并且同时只能有一个线程可以获得该对象monitor的所有权。在线程进入时通过monitorenter尝试取得对象monitor所有权，退出时通过monitorexit释放对象monitor所有权。</p>
+<ul>
+<li><p><strong>monitorenter</strong>过程如下：<br>如果<strong>monitor</strong>的进入数为0，则该线程进入<strong>monitor</strong>，然后将进入数设置为1，该线程即为<strong>monitor</strong>的所有者；<br>如果线程已经占有<strong>monitor</strong>，只是重新进入，则<strong>monitor</strong>的进入数+1（这也是重入锁的实现原理）；<br>如果其他线程已经占用<strong>monitor</strong>，则该线程处于阻塞状态，直至<strong>monitor</strong>的进入数为0，再重新尝试获得<strong>monitor</strong>的所有权。</p>
+</li>
+<li><p><strong>monitorexit</strong>过程如下：<br>执行<strong>monitorexit</strong>的线程必须是 object 所对应的<strong>monitor</strong>的所有者。执行指令时，<strong>monitor</strong>的进入数减1，如果减1后进入数为0，则线程退出 <strong>monitor</strong>，不再是这个<strong>monitor</strong>的所有者，其他被这个<strong>monitor</strong>阻塞的线程可以尝试获取这个<strong>monitor</strong>的所有权。</p>
+</li>
+</ul>
+<h1 id="锁的底层优化"><a href="#锁的底层优化" class="headerlink" title="锁的底层优化"></a>锁的底层优化</h1><p>在Java早期版本中，synchronized属于重量级锁，效率低下，因为monitor是依赖于底层的操作系统的Mutex Lock来实现的，Java的线程是映射到操作系统的原生线程之上的。如果要挂起或者唤醒一个线程，都需要操作系统帮忙完成，而操作系统实现线程之间的切换时需要从用户态转换到内核态，这个状态之间的转换需要相对比较长的时间，时间成本相对较高，这也是为什么早期的synchronized效率低的原因。</p>
+<p>JDK1.6对锁的实现引入了大量的优化，如偏向锁、轻量级锁、自旋锁、适应性自旋锁、锁消除、锁粗化等技术来减少锁操作的开销。</p>
+<h2 id="锁升级"><a href="#锁升级" class="headerlink" title="锁升级"></a>锁升级</h2><p>锁主要存在四中状态，依次是：无锁状态、偏向锁状态、轻量级锁状态、重量级锁状态，他们会随着竞争的激烈而逐渐升级。注意锁可以升级不可降级，这种策略是为了提高获得锁和释放锁的效率。</p>
+<h3 id="1-重量级锁"><a href="#1-重量级锁" class="headerlink" title="1.重量级锁"></a>1.重量级锁</h3><p>monitor监视器锁本质上是依赖操作系统的Mutex Lock互斥量 来实现的，我们一般称之为重量级锁。因为OS实现线程间的切换需要从用户态转换到内核态，这个转换过程成本较高，耗时相对较长，因此synchronized效率会比较低。 </p>
+<h3 id="2-轻量级锁"><a href="#2-轻量级锁" class="headerlink" title="2.轻量级锁"></a>2.轻量级锁</h3><p>轻量级锁，其性能提升的依据是对于绝大部分的锁，在整个生命周期内都是不会存在竞争的，如果没有竞争，轻量级锁就可以使用CAS操作（乐观锁的一种实现，可以线程安全的修改变量，后续文章会讲到）避免互斥量的开销，从而提升效率。我们来看一下轻量级锁的获取和释放流程：</p>
+<ul>
+<li>轻量级锁的获取：</li>
+</ul>
+<ol>
+<li>线程在进入到同步代码块的时候，JVM 会先在当前线程的栈帧中建立一个名为锁记录（Lock Record）的空间，用于存储锁对象当前Mark Word的拷贝（官方称为 Displaced Mark Word），owner 指针指向对象的 Mark Word。如图所示</li>
+</ol>
+<p><img src="https://i.loli.net/2020/03/01/Nqvr4hlWdV26Xs5.jpg" alt="simpleLock.jpg"></p>
+<ol start="2">
+<li><p>JVM使用CAS操作尝试将对象头中的Mark Word更新为指向Lock Record的指针。如果更新成功，则执行步骤3；更新失败，则执行步骤4。</p>
+</li>
+<li><p>如果更新成功，那么这个线程就拥有了该对象的锁，对象的Mark Word的锁状态为轻量级锁（标志位转变为’00’）。此时线程堆栈与对象头的状态如图所示</p>
+</li>
+</ol>
+<p><img src="https://i.loli.net/2020/03/01/Aper9L3jV4F8Is2.jpg" alt="simpleLock2.jpg"></p>
+<ol start="4">
+<li>如果更新失败，JVM首先检查对象的Mark Word是否指向当前线程的栈帧。如果是，就说明当前线程已经拥有了该对象的锁，那就可以直接进入同步代码块继续执行；如果不是，就说明这个锁对象已经被其他的线程抢占了，当前线程会尝试自旋一定次数来获取锁。如果自旋一定次数CAS操作仍没有成功，那么轻量级锁就要升级为重量级锁（锁的标志位转变为’10’），Mark Word 中存储的就是指向重量级锁的指针，后面等待锁的线程也就进入阻塞状态。</li>
+</ol>
+<ul>
+<li>轻量级锁的释放：<br>通过CAS操作用线程中复制的DisplacedMark Word中的数据替换对象当前的Mark Word。如果替换成功，说明整个同步过程就完成了；如果替换失败，说明有其他线程尝试过获取该锁，并且此时锁已经是重量级锁，那就在释放锁的同时，唤醒被挂起的线程。</li>
+</ul>
+<h3 id="3-偏向锁"><a href="#3-偏向锁" class="headerlink" title="3.偏向锁"></a>3.偏向锁</h3><p>在一些情况下总是同一线程多次获得锁，此时第二次再重新做CAS修改对象头中的Mark Word这样的操作，有些多余。所以就有了偏向锁，只需要检查是否为偏向锁、锁标识为以及线程ID即可，只要是同一线程就不再修改对象头。其目的为了在无多线程竞争的情况下尽量减少不必要的轻量级锁执行路径。</p>
+<ul>
+<li>偏向锁的获取：</li>
+</ul>
+<ol>
+<li>检测Mark Word是否为可偏向状态，即是否为偏向锁1，锁标识位为01。</li>
+<li>若为可偏向状态，则测试线程ID是否为当前线程ID，如果是，则执行步骤（5），否则执行步骤（3）。</li>
+<li>如果线程ID不为当前线程ID，则通过CAS操作竞争锁，竞争成功，则将Mark Word的线程ID替换为当前线程ID，否则执行步骤（4）。</li>
+<li>通过CAS竞争锁失败，证明当前存在多线程竞争情况，当到达全局安全点，获得偏向锁的线程被挂起，偏向锁升级为轻量级锁，然后被阻塞在安全点的线程继续往下执行同步代码块。</li>
+<li>执行同步代码块。</li>
+</ol>
+<ul>
+<li>偏向锁的释放</li>
+</ul>
+<ol>
+<li>当一个线程已经持有偏向锁，而另外一个线程尝试竞争偏向锁时，CAS替换线程ID操作失败，则开始撤销偏向锁。偏向锁的撤销，需要等待原持有偏向锁的线程到达全局安全点（在这个时间点上没有字节码正在执行），暂停该线程，并检查其状态。</li>
+<li>如果原持有偏向锁的线程不处于活动状态或已退出同步代码块，则该线程释放锁。将对象头设置为无锁状态（锁标志位为’01’，是否偏向标志位为’0’）。</li>
+<li>如果原持有偏向锁的线程未退出同步代码块，则升级为轻量级锁（锁标志位为’00’）</li>
+</ol>
+<h2 id="其他优化"><a href="#其他优化" class="headerlink" title="其他优化"></a>其他优化</h2><h3 id="锁消除"><a href="#锁消除" class="headerlink" title="锁消除"></a>锁消除</h3><p>锁消除理解起来很简单，它指的就是虚拟机即使编译器在运行时，如果检测到那些共享数据不可能存在竞争，那么就执行锁消除。锁消除可以节省毫无意义的请求锁的时间。</p>
+<h3 id="锁粗化"><a href="#锁粗化" class="headerlink" title="锁粗化"></a>锁粗化</h3><p>锁粗化就是 JVM 检测到一串零碎的操作都对同一个对象加锁，则会把加锁同步的范围粗化到整个操作序列的外部。</p>
+<h1 id="注意事项"><a href="#注意事项" class="headerlink" title="注意事项"></a>注意事项</h1><p>synchronized虽然能解决并发问题，但是也不能乱用。一方面过多的加锁会影响系统的性能，如果只需要保证内存可见性的话，用volatile效率会更高；另一方面如果锁加的不规范可能会导致死锁的发生。</p>
+<p>但是即使我们正确的使用锁了，如果同步代码写的不好，也有一些隐患，请看下面这个例子：</p>
+<figure class="highlight plain"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br></pre></td><td class="code"><pre><span class="line">public class Syn</span><br><span class="line">&#123;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Object lock&#x3D;new Object();</span><br><span class="line">       Thread t1&#x3D; new Thread(()-&gt;&#123;</span><br><span class="line">            synchronized (lock)&#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                    System.out.println(&quot;thread 1 : &quot;+Thread.currentThread().isInterrupted());</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">       Thread t2&#x3D; new Thread(()-&gt;&#123;</span><br><span class="line">            synchronized (lock)&#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                    System.out.println(&quot;thread 2 : &quot;+Thread.currentThread().isInterrupted());</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">       t1.start();</span><br><span class="line">       t2.start();</span><br><span class="line"></span><br><span class="line">       Thread.sleep(1000);</span><br><span class="line">       synchronized (lock)&#123;</span><br><span class="line">           t1.interrupt();</span><br><span class="line">           lock.notifyAll();</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从代码的层面来看，最终结果应当是线程t1抛出异常，线程t2继续执行。但是事实真的如此吗？大家可以尝试一下～</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>synchronized是Java中十分重要的一个关键字，短短一篇文章很难把它说透彻。我也只不过是粗略的介绍了一下它的基本使用和原理，如有说的不对的地方，还请大家多多包涵hhhh～</p>
+
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+        <div class="declare">
+          <ul class="post-copyright">
+            <li>
+              <i class="ri-copyright-line"></i>
+              <strong>版权声明： </strong s>
+              本博客所有文章除特别声明外，均采用 <a href="https://www.apache.org/licenses/LICENSE-2.0.html" rel="external nofollow"
+                target="_blank">Apache License 2.0</a> 许可协议。转载请注明出处！
+            </li>
+          </ul>
+        </div>
+        
+    <footer class="article-footer">
+      
+          
+<div class="share-btn">
+      <span class="share-sns share-outer">
+        <i class="ri-share-forward-line"></i>
+        分享
+      </span>
+      <div class="share-wrap">
+        <i class="arrow"></i>
+        <div class="share-icons">
+          
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="ri-weibo-fill"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="ri-wechat-fill"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="ri-qq-fill"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="ri-douban-line"></i>
+          </a>
+          <!-- <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a> -->
+          
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="ri-facebook-circle-fill"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="ri-twitter-fill"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="ri-google-fill"></i>
+          </a>
+        </div>
+      </div>
+</div>
+
+<div class="wx-share-modal">
+    <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div id="share-mask"></div>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+  
+  <nav class="article-nav">
+    
+      <a href="/2020/02/08/volatile%E5%92%8CCAS/" class="article-nav-link">
+        <strong class="article-nav-caption">上一篇</strong>
+        <div class="article-nav-title">
+          
+            volatile和CAS
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/" class="article-nav-link">
+        <strong class="article-nav-caption">下一篇</strong>
+        <div class="article-nav-title">内存可见性、原子性和重排序</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+  
+<!-- valine评论 -->
+<div id="vcomments-box">
+    <div id="vcomments">
+    </div>
+</div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        app_id: '',
+        app_key: '',
+        path: window.location.pathname,
+        notify: 'false',
+        verify: 'false',
+        avatar: 'mp',
+        placeholder: '给我的文章加点评论吧~',
+        recordIP: true
+    });
+    const infoEle = document.querySelector('#vcomments .info');
+    if (infoEle && infoEle.childNodes && infoEle.childNodes.length > 0) {
+        infoEle.childNodes.forEach(function (item) {
+            item.parentNode.removeChild(item);
+        });
+    }
+</script>
+<style>
+    #vcomments-box {
+        padding: 5px 30px;
+    }
+
+    @media screen and (max-width: 800px) {
+        #vcomments-box {
+            padding: 5px 0px;
+        }
+    }
+
+    #vcomments-box #vcomments {
+        background-color: #fff;
+    }
+
+    .v .vlist .vcard .vh {
+        padding-right: 20px;
+    }
+
+    .v .vlist .vcard {
+        padding-left: 10px;
+    }
+</style>
+
+  
+
+  
+  
+  
+
+</article>
+</section>
+      <footer class="footer">
+  <div class="outer">
+    <ul class="list-inline">
+      <li>
+        &copy;
+        2020
+        Karthur
+      </li>
+      <li>
+        
+      </li>
+    </ul>
+    <ul class="list-inline">
+      <li>
+        
+        
+        <span>
+  <i>PV:<span id="busuanzi_value_page_pv"></span></i>
+  <i>UV:<span id="busuanzi_value_site_uv"></span></i>
+</span>
+        
+      </li>
+      
+      <li>
+        <!-- cnzz统计 -->
+        
+        <script type="text/javascript" src='https://s9.cnzz.com/z_stat.php?id=1278069914&amp;web_id=1278069914'></script>
+        
+      </li>
+    </ul>
+  </div>
+</footer>
+      <div class="to_top">
+        <div class="totop" id="totop">
+  <i class="ri-arrow-up-line"></i>
+</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+  <div class="logo">
+    <a href="/"><img src="/images/ayer-side.svg" alt="愿那颗星星一直指引你"></a>
+  </div>
+  
+  <ul class="nav nav-main">
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/">主页</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/archives">归档</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/categories">分类</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/tags">标签</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/about">关于我</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="https://github.com/KArthurL" target="_blank" rel="noopener">github</a>
+    </li>
+    
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      
+      <a class="nav-item-link nav-item-search"  title="Search">
+        <i class="ri-search-line"></i>
+      </a>
+      
+      
+      <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+        <i class="ri-rss-line"></i>
+      </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+    </aside>
+    <div id="mask"></div>
+
+<!-- #reward -->
+<div id="reward">
+  <span class="close"><i class="ri-close-line"></i></span>
+  <p class="reward-p"><i class="ri-cup-line"></i>请我喝杯咖啡吧~</p>
+  <div class="reward-box">
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/alipay.jpg">
+      <span class="reward-type">支付宝</span>
+    </div>
+    
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/wechat.jpg">
+      <span class="reward-type">微信</span>
+    </div>
+    
+  </div>
+</div>
+    
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+<script src="/js/share.js"></script>
+
+
+
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script>
+  try {
+    var typed = new Typed("#subtitle", {
+    strings: ['一闪一闪亮晶晶','满天都是小星星','海上生明月，天涯共此时'],
+    startDelay: 0,
+    typeSpeed: 200,
+    loop: true,
+    backSpeed: 100,
+    showCursor: true
+    });
+  } catch (err) {
+  }
+  
+</script>
+
+
+
+
+<script src="/js/tocbot.min.js"></script>
+
+<script>
+  // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+  tocbot.init({
+    tocSelector: '.tocbot',
+    contentSelector: '.article-entry',
+    headingSelector: 'h1, h2, h3, h4, h5, h6',
+    hasInnerContainers: true,
+    scrollSmooth: true,
+    scrollContainer:'main',
+    positionFixedSelector: '.tocbot',
+    positionFixedClass: 'is-position-fixed',
+    fixedSidebarOffset: 'auto',
+    onClick: (e) => {
+      $('.toc-link').removeClass('is-active-link');
+      $(`a[href=${e.target.hash}]`).addClass('is-active-link');
+      $(e.target.hash).scrollIntoView();
+      return false;
+    }
+  });
+</script>
+
+
+<script>
+  var ayerConfig = {
+    mathjax: false
+  }
+</script>
+
+
+<script src="/js/ayer.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.css">
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" style="display:none" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css">
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"></script>
+
+<script>
+    function viewer_init() {
+        let pswpElement = document.querySelectorAll('.pswp')[0];
+        let $imgArr = document.querySelectorAll(('.article-entry img:not(.reward-img)'))
+
+        $imgArr.forEach(($em, i) => {
+            $em.onclick = () => {
+                // slider展开状态
+                // todo: 这样不好，后面改成状态
+                if (document.querySelector('.left-col.show')) return
+                let items = []
+                $imgArr.forEach(($em2, i2) => {
+                    let img = $em2.getAttribute('data-idx', i2)
+                    let src = $em2.getAttribute('data-target') || $em2.getAttribute('src')
+                    let title = $em2.getAttribute('alt')
+                    // 获得原图尺寸
+                    const image = new Image()
+                    image.src = src
+                    items.push({
+                        src: src,
+                        w: image.width || $em2.width,
+                        h: image.height || $em2.height,
+                        title: title
+                    })
+                })
+                var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, {
+                    index: parseInt(i)
+                });
+                gallery.init()
+            }
+        })
+    }
+    viewer_init()
+</script>
+
+
+
+
+<script type="text/javascript" src="https://js.users.51.la/20544303.js"></script>
+
+    
+  </div>
+</body>
+
+</html>

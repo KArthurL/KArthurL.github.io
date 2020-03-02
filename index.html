@@ -66,6 +66,385 @@
     
     
     
+    <article id="post-为什么阿里巴巴手册中禁用默认实现的线程池" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/"
+    >为什么阿里巴巴手册中禁用默认实现的线程池</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/" class="article-date">
+  <time datetime="2020-02-12T14:38:30.000Z" itemprop="datePublished">2020-02-12</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E8%A7%84%E8%8C%83/">规范</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>在阿里巴巴Java开发手册中有一条规则：【强制】线程池不允许使用Executors去创建，而是通过ThreadPoolExecutor的方式，这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。</p>
+<p>如何去理解这句话？</p>
+      
+      <a class="article-more-link" href="/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%A7%84%E8%8C%83/" rel="tag">规范</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
+    <article id="post-ThreadLocal解析" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/"
+    >ThreadLocal解析</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/" class="article-date">
+  <time datetime="2020-02-11T14:34:40.000Z" itemprop="datePublished">2020-02-11</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>在之前的几篇文章中，更多的讲的是线程之间的并发操作，多线程在读写共享变量时可能需要进行一些同步操作或者是将变量用volatile修饰等等。如果说每个线程都需要自己的独立实例，且该实例需要在多个方法中被使用（相同线程数据共享），又该如何去实现呢？在方法参数上定义这个共享的变量吗？显然这样子耦合太严重了，牵一发而动全身；那么使用一个全局的集合来共享数据？这又涉及到了多个线程之间的同步问题，只是为了能让线程间隔离数据而使用同步开销太大。</p>
+<p>ThreadLocal就是适用于这样的场景。本文从ThreadLocal的简单使用开始入手，通过源码来阐述其使用原理以及一些隐患。</p>
+      
+      <a class="article-more-link" href="/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
+    <article id="post-Java中的原子类" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/"
+    >Java中的原子基本类型类</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/" class="article-date">
+  <time datetime="2020-02-09T14:34:18.000Z" itemprop="datePublished">2020-02-09</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>Java从JDK1.5开始提供了java.util.concurrent.atomic包，这个包中当原子操作类提供了一种用法简单、性能高效、线程安全地更新一个变量的方式。变量的类型有很多，所以Atomic包下一共提供了13个类。本文主要以AtomicInteger为例，以小见大，对它的源码进行剖析，来明白原子类的实现原理。<br>阅读本文前，最好对volatile和CAS有一定了解，这方面可以请看上一篇文章。</p>
+      
+      <a class="article-more-link" href="/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
+    <article id="post-volatile和CAS" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/02/08/volatile%E5%92%8CCAS/"
+    >volatile和CAS</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/08/volatile%E5%92%8CCAS/" class="article-date">
+  <time datetime="2020-02-08T13:51:50.000Z" itemprop="datePublished">2020-02-08</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>在讲Java并发编程的时候，volatile关键字和CAS操作都扮演着重要的角色。本文之所以把这两个放在一起讲，是因为两者的有机结合能实现锁的功能。volatile能保证内存可见性和防止重排序，CAS能保证操作的原子性（其实也能保证可见性），两者结合几乎拓展出了整个Java的并发包，Java中Lock的底层实现AQS所依赖的也正是volatile和CAS。</p>
+<p>话不多说，现在让我们一起揭开它们的神秘面纱吧～</p>
+      
+      <a class="article-more-link" href="/2020/02/08/volatile%E5%92%8CCAS/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
+    <article id="post-synchronized的原理和使用" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/"
+    >synchronized的原理和使用</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/" class="article-date">
+  <time datetime="2020-02-05T10:13:54.000Z" itemprop="datePublished">2020-02-05</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/Java%E5%B9%B6%E5%8F%91/">Java并发</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。</p>
+<p>本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。</p>
+      
+      <a class="article-more-link" href="/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
     <article id="post-内存可见性、原子性和重排序" class="article article-type-post" itemscope
   itemprop="blogPost" data-scroll-reveal>
 
@@ -74,7 +453,7 @@
     <header class="article-header">
        
 <h2 itemprop="name">
-  <a class="article-title" href="/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"
+  <a class="article-title" href="/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"
     >内存可见性、原子性和重排序</a
   >
 </h2>
@@ -85,8 +464,8 @@
 
     
     <div class="article-meta">
-      <a href="/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/" class="article-date">
-  <time datetime="2020-02-29T14:11:26.000Z" itemprop="datePublished">2020-02-29</time>
+      <a href="/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/" class="article-date">
+  <time datetime="2020-02-03T14:11:26.000Z" itemprop="datePublished">2020-02-03</time>
 </a>
       
   <div class="article-category">
@@ -111,7 +490,7 @@
       
       <p>在上一篇文章中，笔者简单介绍了下<a href="https://karthurl.github.io/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/" target="_blank" rel="noopener">Java内存模型</a>。本文承接上文，主要以代码+图片的形式呈现给大家，其主要目的是让大家对于并发程序中的内存可见性、原子性以及重排序有一定的了解。这三个问题也是并发程序为什么难写的原因。</p>
       
-      <a class="article-more-link" href="/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/">阅读更多...</a>
+      <a class="article-more-link" href="/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/">阅读更多...</a>
       
       
       <!-- reward -->
@@ -149,7 +528,7 @@
     <header class="article-header">
        
 <h2 itemprop="name">
-  <a class="article-title" href="/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/"
+  <a class="article-title" href="/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/"
     >Java内存模型</a
   >
 </h2>
@@ -160,8 +539,8 @@
 
     
     <div class="article-meta">
-      <a href="/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/" class="article-date">
-  <time datetime="2020-02-29T10:29:40.000Z" itemprop="datePublished">2020-02-29</time>
+      <a href="/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/" class="article-date">
+  <time datetime="2020-02-02T10:29:40.000Z" itemprop="datePublished">2020-02-02</time>
 </a>
       
   <div class="article-category">
@@ -187,7 +566,7 @@
       <p>本文从Java内存模型开始，通过对内存模型的理解让大家对于并发中的内存可见性、原子性和重排序有一些自己的想法，为后续的Java并发编程打下基础。</p>
 <p>阅读本文前，需要有一定的Java基础，最好还有一定的并发编程基础。</p>
       
-      <a class="article-more-link" href="/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/">阅读更多...</a>
+      <a class="article-more-link" href="/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/">阅读更多...</a>
       
       
       <!-- reward -->
@@ -202,85 +581,6 @@
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%B9%B6%E5%8F%91/" rel="tag">并发</a></li></ul>
 
-
-    </footer>
-
-  </div>
-
-  
-
-  
-  
-  
-
-  
-
-</article>
-    
-    <article id="post-hello-world" class="article article-type-post" itemscope
-  itemprop="blogPost" data-scroll-reveal>
-
-  <div class="article-inner">
-    
-    <header class="article-header">
-       
-<h2 itemprop="name">
-  <a class="article-title" href="/2020/02/28/hello-world/"
-    >Hello World</a
-  >
-</h2>
-  
-
-    </header>
-    
-
-    
-    <div class="article-meta">
-      <a href="/2020/02/28/hello-world/" class="article-date">
-  <time datetime="2020-02-28T12:50:46.705Z" itemprop="datePublished">2020-02-28</time>
-</a>
-      
-      
-      
-      
-    </div>
-    
-
-    
-
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-
-
-      
-
-      
-      <p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-
-      
-      <!-- reward -->
-      
-    </div>
-    
-    
-      <!-- copyright -->
-      
-    <footer class="article-footer">
-      
-      
 
     </footer>
 

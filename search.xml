@@ -1,8 +1,391 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>为什么阿里巴巴手册中禁用默认实现的线程池</title>
+    <url>/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/</url>
+    <content><![CDATA[<p>在阿里巴巴Java开发手册中有一条规则：【强制】线程池不允许使用Executors去创建，而是通过ThreadPoolExecutor的方式，这样的处理方式让写的同学更加明确线程池的运行规则，规避资源耗尽的风险。</p>
+<p>如何去理解这句话？</p>
+<a id="more"></a>
+
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>线程池的使用应该是非常常见的，包括我自己在项目中也有用到。Java中为我们提供了四种默认实现的线程池，分别是：</p>
+<ol>
+<li>newFixedThreadPool(int Threads):创建固定数目的线程池。</li>
+<li>newSingleThreadPoolExecutor():创建一个单线程的线程池。</li>
+<li>newCacheThreadPool():创建一个可缓存的线程池，调用execute将重用以前构成的线程。</li>
+<li>newScheduledThreadPool(int corePoolSize)：创建一个支持定时及周期性的任务执行的线程池</li>
+</ol>
+<p>后来在阅读阿里巴巴Java开发手册的时候，其中明确指出了，线程池不允许使用Executors去创建。那么用默认实现的线程池会有什么隐患？这可能需要从线程池的参数和运行机制说起……</p>
+<h1 id="线程池的核心参数"><a href="#线程池的核心参数" class="headerlink" title="线程池的核心参数"></a>线程池的核心参数</h1><p>不论是使用默认的线程池还是自定义的线程池，最后都会调用这样子的构造函数：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public ThreadPoolExecutor(int corePoolSize,</span><br><span class="line">                          int maximumPoolSize,</span><br><span class="line">                          long keepAliveTime,</span><br><span class="line">                          TimeUnit unit,</span><br><span class="line">                          BlockingQueue&lt;Runnable&gt; workQueue,</span><br><span class="line">                          ThreadFactory threadFactory,</span><br><span class="line">                          RejectedExecutionHandler handler) &#123;</span><br><span class="line">    if (corePoolSize &lt; 0 ||</span><br><span class="line">        maximumPoolSize &lt;&#x3D; 0 ||</span><br><span class="line">        maximumPoolSize &lt; corePoolSize ||</span><br><span class="line">        keepAliveTime &lt; 0)</span><br><span class="line">        throw new IllegalArgumentException();</span><br><span class="line">    if (workQueue &#x3D;&#x3D; null || threadFactory &#x3D;&#x3D; null || handler &#x3D;&#x3D; null)</span><br><span class="line">        throw new NullPointerException();</span><br><span class="line">    this.corePoolSize &#x3D; corePoolSize;</span><br><span class="line">    this.maximumPoolSize &#x3D; maximumPoolSize;</span><br><span class="line">    this.workQueue &#x3D; workQueue;</span><br><span class="line">    this.keepAliveTime &#x3D; unit.toNanos(keepAliveTime);</span><br><span class="line">    this.threadFactory &#x3D; threadFactory;</span><br><span class="line">    this.handler &#x3D; handler;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>构造函数的参数说明：</p>
+<table>
+<thead>
+<tr>
+<th align="left">参数名称</th>
+<th align="left">说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="left">corePoolSize</td>
+<td align="left">线程池核心线程数量</td>
+</tr>
+<tr>
+<td align="left">maximumPoolSize</td>
+<td align="left">线程池最大线程数量</td>
+</tr>
+<tr>
+<td align="left">keepAliveTime</td>
+<td align="left">空闲线程存活时间</td>
+</tr>
+<tr>
+<td align="left">unit</td>
+<td align="left">时间单位</td>
+</tr>
+<tr>
+<td align="left">workQueue</td>
+<td align="left">线程池所使用的缓冲队列</td>
+</tr>
+<tr>
+<td align="left">threadFactory</td>
+<td align="left">线程池创建线程使用的工厂</td>
+</tr>
+<tr>
+<td align="left">handler</td>
+<td align="left">线程池对拒绝任务的处理策略</td>
+</tr>
+</tbody></table>
+<h1 id="线程池的运行机制"><a href="#线程池的运行机制" class="headerlink" title="线程池的运行机制"></a>线程池的运行机制</h1><p>线程池的运行机制如下图所示：</p>
+<p><img src="https://i.loli.net/2020/03/02/Z5DvrTj2gX7Vye3.jpg" alt="threadpool.jpg"></p>
+<h1 id="Executors实现的默认线程池及其隐患"><a href="#Executors实现的默认线程池及其隐患" class="headerlink" title="Executors实现的默认线程池及其隐患"></a>Executors实现的默认线程池及其隐患</h1><h2 id="FixedThreadPool"><a href="#FixedThreadPool" class="headerlink" title="FixedThreadPool"></a>FixedThreadPool</h2><p>固定线程数的线程池通过Executors.newFixedThreadPool(int nThreads)来创建，我们看看它的详细参数：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static ExecutorService newFixedThreadPool(int nThreads) &#123;</span><br><span class="line">        return new ThreadPoolExecutor(nThreads, nThreads,</span><br><span class="line">                                      0L, TimeUnit.MILLISECONDS,</span><br><span class="line">                                      new LinkedBlockingQueue&lt;Runnable&gt;());</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到其核心线程数和最大线程数是相等的，而它所使用的阻塞队列是无界的（准确的说最大值为Integer.MAX_VALUE）。当我们提交任务到达线程数上限的时候，如果线程执行任务的速度远小于任务的提交速度，那么任务就会在阻塞队列中堆积，有OOM的隐患。</p>
+<h2 id="SingleThreadPoolExecutor"><a href="#SingleThreadPoolExecutor" class="headerlink" title="SingleThreadPoolExecutor"></a>SingleThreadPoolExecutor</h2><p>单线程的线程通过Executors.SingleThreadPoolExecutor()来创建，我们看看它的详细参数：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static ExecutorService newSingleThreadExecutor() &#123;</span><br><span class="line">    return new FinalizableDelegatedExecutorService</span><br><span class="line">        (new ThreadPoolExecutor(1, 1,</span><br><span class="line">                                0L, TimeUnit.MILLISECONDS,</span><br><span class="line">                                new LinkedBlockingQueue&lt;Runnable&gt;()));</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到其核心线程数和最大线程数恒为1，而它所使用的阻塞队列也无界的。这就出现了与FixedThreadPool相同的问题，有OOM的隐患。</p>
+<h2 id="CacheThreadPool"><a href="#CacheThreadPool" class="headerlink" title="CacheThreadPool"></a>CacheThreadPool</h2><p>缓存线程池通过Executors.newCacheThreadPool()来创建，我们看看它的详细参数：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static ExecutorService newCachedThreadPool() &#123;</span><br><span class="line">    return new ThreadPoolExecutor(0, Integer.MAX_VALUE,</span><br><span class="line">                                  60L, TimeUnit.SECONDS,</span><br><span class="line">                                  new SynchronousQueue&lt;Runnable&gt;());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这线程池比较特殊，当一个任务提交时，corePoolSize为0不创建核心线程，SynchronousQueue是一个不存储元素的队列，可以理解为队里永远是满的，因此最终会创建非核心线程来执行任务。对于非核心线程空闲60s时将被回收。因为Integer.MAX_VALUE非常大，可以认为在任务提交过快的时候是可以无限创建线程的，在资源有限的情况下容易引起OOM异常。</p>
+<h2 id="ScheduledThreadPool"><a href="#ScheduledThreadPool" class="headerlink" title="ScheduledThreadPool"></a>ScheduledThreadPool</h2><p>延时线程池又是一类特殊的线程池，可以通过Executors.newScheduledThreadPool(int corePoolSize)来创建：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static ScheduledExecutorService newScheduledThreadPool(int corePoolSize) &#123;</span><br><span class="line">    return new ScheduledThreadPoolExecutor(corePoolSize);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public ScheduledThreadPoolExecutor(int corePoolSize) &#123;</span><br><span class="line">    super(corePoolSize, Integer.MAX_VALUE,</span><br><span class="line">          DEFAULT_KEEPALIVE_MILLIS, MILLISECONDS,</span><br><span class="line">          new DelayedWorkQueue());</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>ScheduledThreadPoolExecutor是一个继承自ThreadPoolExecutor的类，最终调用的还是ThreadPoolExecutor的构造方法。这一类线程池出现隐患的地方在于它的队列DelayedWorkQueue，这是一个ScheduledThreadPoolExecutor的内部类。这个队列的初始量为16，当队列满了之后会自动进行扩容，容量上限为Integer.MAX_VALUE，因此如果线程执行任务的速度远小于任务的提交速度，那么任务就会在阻塞队列中堆积，有OOM的隐患。</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>大概说了说每种线程池出现隐患的原因，在实际使用的时候，我们可以采用自定义ThreadPoolExecutor的方式来使用线程池。话说回来，规范之所以是规范，一定是有原因，我们除了遵守规范以外，最好还是要去理解它背后深层次的原因。</p>
+]]></content>
+      <categories>
+        <category>规范</category>
+      </categories>
+      <tags>
+        <tag>并发</tag>
+        <tag>原创</tag>
+        <tag>规范</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>ThreadLocal解析</title>
+    <url>/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/</url>
+    <content><![CDATA[<p>在之前的几篇文章中，更多的讲的是线程之间的并发操作，多线程在读写共享变量时可能需要进行一些同步操作或者是将变量用volatile修饰等等。如果说每个线程都需要自己的独立实例，且该实例需要在多个方法中被使用（相同线程数据共享），又该如何去实现呢？在方法参数上定义这个共享的变量吗？显然这样子耦合太严重了，牵一发而动全身；那么使用一个全局的集合来共享数据？这又涉及到了多个线程之间的同步问题，只是为了能让线程间隔离数据而使用同步开销太大。</p>
+<p>ThreadLocal就是适用于这样的场景。本文从ThreadLocal的简单使用开始入手，通过源码来阐述其使用原理以及一些隐患。</p>
+<a id="more"></a>
+
+<h1 id="ThreadLocal简介"><a href="#ThreadLocal简介" class="headerlink" title="ThreadLocal简介"></a>ThreadLocal简介</h1><p>ThreadLocal是JDK包提供的一种工具，我们可以从名字这里看到，它能够提供线程的本地变量，每次线程读写变量时，都是读写的本地变量，这就实现了一个线程之间变量的隔离。</p>
+<h1 id="ThreadLocal的简单使用"><a href="#ThreadLocal的简单使用" class="headerlink" title="ThreadLocal的简单使用"></a>ThreadLocal的简单使用</h1><p>这边给出一段代码，来帮助我们直观的了解ThreadLocal是如何使用的：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class TL &#123;</span><br><span class="line"></span><br><span class="line">    private static ThreadLocal&lt;String&gt; threadLocal&#x3D;new ThreadLocal&lt;&gt;();</span><br><span class="line"></span><br><span class="line">    private static void print()&#123;</span><br><span class="line">        &#x2F;&#x2F;打印线程名称以及该线程对应的本地变量</span><br><span class="line">        System.out.println(Thread.currentThread().getName()+&quot;: &quot;+threadLocal.get()); </span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    public static void main(String[] args) &#123;</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            threadLocal.set(&quot;这是副线程&quot;); &#x2F;&#x2F;副线程设置ThreadLocal</span><br><span class="line">            print();</span><br><span class="line">        &#125;).start();</span><br><span class="line">        threadLocal.set(&quot;这是main线程&quot;);  &#x2F;&#x2F;主线程设置ThreadLoacl</span><br><span class="line">        print();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>这是运行结果：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">main: 这是main线程</span><br><span class="line">Thread-0: 这是副线程</span><br></pre></td></tr></table></figure>
+<p>在上面的例子中，一共两个线程，主线程和副线程。在每个线程内部设置了本地变量的值，然后调用print方法打印当前线程名和本地变量的值，可以发现即使是一个ThreadLocal变量，不同的线程从中获取的值是不同的。</p>
+<h1 id="ThreadLocal的实现原理"><a href="#ThreadLocal的实现原理" class="headerlink" title="ThreadLocal的实现原理"></a>ThreadLocal的实现原理</h1><p>在分析ThreadLocal的源码之前，或许从宏观上了解一下本地变量是如何储存的比较好，这样到时候去看源码的时候就不会一脸懵逼（我当时就是这样的）。我把ThreadLocal的储存原理抽象一下，请看下面这张图：</p>
+<p><img src="https://i.loli.net/2020/03/02/eO2NctRIHMrnwFm.jpg" alt="ThreadLocal.jpg"></p>
+<p>我们把ThreadLocal当作一张一卡通，可以开启所有的储物柜对应id的格子。比如图中的ThreadLocal一卡通可以打开所有储物柜的1号格子。但是不同的储物柜里，放着不同的东西，比如：饮料、食物等。我们即使使用相同的卡去开格子，不同的储物柜得到的东西也是不同的。我们得到的一定是上次往这个储物柜里放的东西。</p>
+<p>再结合上一节里的代码，我们可以思考一段时间再往下看。</p>
+<p>不同的线程设置本地变量，就像我们拿着卡在不同的储物柜存放东西；下次对应线程取出本地变量时，就像拿着卡去对应的储物柜获取东西。这样理解起来，或许会更方便一些，线程与ThreadLocal存在着这样一种对应关系。那么问题来了，线程是怎么储存本地变量的？或者说，线程是怎么提供类似于储物柜这样子的功能的。我们来看看Thread(注意不是ThreadLocal)的源码：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;* ThreadLocal values pertaining to this thread. This map is maintained</span><br><span class="line"> * by the ThreadLocal class. *&#x2F;</span><br><span class="line">ThreadLocal.ThreadLocalMap threadLocals &#x3D; null;</span><br></pre></td></tr></table></figure>
+
+<p>我们可以看到Thread中有这样一个属性，叫做ThreadLocalMap，初始化的时候是null，它是属于ThreadLocal内部的一个类，就是这个Map实现了类似于储物箱的功能。现在翻开ThreadLocal的源码，看看这个内部类是怎么回事（源码有点长，我做了简略）：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">static class ThreadLocalMap &#123;</span><br><span class="line"></span><br><span class="line">       &#x2F;&#x2F;Entry为ThreadLocalMap静态内部类，对ThreadLocal的弱引用</span><br><span class="line">       &#x2F;&#x2F;同时让ThreadLocal和储值形成key-value的关系</span><br><span class="line">       static class Entry extends WeakReference&lt;ThreadLocal&lt;?&gt;&gt; &#123;</span><br><span class="line">           </span><br><span class="line">           Object value;</span><br><span class="line"></span><br><span class="line">           Entry(ThreadLocal&lt;?&gt; k, Object v) &#123;</span><br><span class="line">               super(k);</span><br><span class="line">               value &#x3D; v;</span><br><span class="line">           &#125;</span><br><span class="line">       &#125;</span><br><span class="line"></span><br><span class="line">       private static final int INITIAL_CAPACITY &#x3D; 16;</span><br><span class="line"></span><br><span class="line">       private Entry[] table;</span><br><span class="line"></span><br><span class="line">       private int size &#x3D; 0;</span><br><span class="line"></span><br><span class="line">       private int threshold; &#x2F;&#x2F; Default to 0</span><br><span class="line"></span><br><span class="line">       省略号……</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>通过这段代码我们不难发现，ThreadLocalMap很像HashMap（hash冲突的处理不同），内部是一个Entry数组，用于存放ThreadLocal-Value的。一切的存放/读取操作都是通过这个Entry数组来实现的。<strong>值得注意的是</strong>，这个Entry类型对ThreadLocal也就是Key是一个弱引用，这点下文会提到。</p>
+<p>到了这里，应当可以知道，每个线程是如何存放本地变量的了：每个线程Thread持有一个ThreadLocalMap类型的实例threadLocals，在存放的时候，以ThreadLocal为Key来存取Value到线程私有的ThreadLocalMap中去；获取的时候也是以ThreadLocal为Key到自己线程持有的ThreadLocalMap中去拿。这也解释了为什么相同的ThreadLocal会取得不同的实例对象，因为存放容器的对象是不同的。大家可以再仔细思考下～</p>
+<p>我们再来看看ThreadLocal比较重要的两个方法，即set（），get（）的底层实现。</p>
+<p>首先是set（）：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public void set(T value) &#123;</span><br><span class="line">       Thread t &#x3D; Thread.currentThread(); &#x2F;&#x2F;获取当前线程</span><br><span class="line">       ThreadLocalMap map &#x3D; getMap(t);    &#x2F;&#x2F;获取当前线程所持有的ThreadLocalMap</span><br><span class="line">       if (map !&#x3D; null) &#123;                 &#x2F;&#x2F;如果ThreadLocalMap不为空，存入自己和value</span><br><span class="line">           map.set(this, value);</span><br><span class="line">       &#125; else &#123;</span><br><span class="line">           createMap(t, value);           &#x2F;&#x2F;否则给当前线程新建一个ThreadLocalMap，并存入value</span><br><span class="line">       &#125;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+<p>set方法比较简单，可以直接看注释，接下来是get（）：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public T get() &#123;</span><br><span class="line">    Thread t &#x3D; Thread.currentThread(); &#x2F;&#x2F;获取当前线程</span><br><span class="line">    ThreadLocalMap map &#x3D; getMap(t);    &#x2F;&#x2F;获取当前线程所持有的ThreadLocalMap</span><br><span class="line">    if (map !&#x3D; null) &#123;                 &#x2F;&#x2F;如果map不为空则根据自己来获取Entry</span><br><span class="line">        ThreadLocalMap.Entry e &#x3D; map.getEntry(this);</span><br><span class="line">        if (e !&#x3D; null) &#123;               &#x2F;&#x2F;如果Entry不为空则根返回Entry中的value</span><br><span class="line">            @SuppressWarnings(&quot;unchecked&quot;)</span><br><span class="line">            T result &#x3D; (T)e.value;</span><br><span class="line">            return result;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    return setInitialValue();        &#x2F;&#x2F;如果没有map或者找不到对应的Entry 调用setInitialValue()并返回</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">private T setInitialValue() &#123;</span><br><span class="line">    T value &#x3D; initialValue();         &#x2F;&#x2F;就是null</span><br><span class="line">    Thread t &#x3D; Thread.currentThread();</span><br><span class="line">    ThreadLocalMap map &#x3D; getMap(t);</span><br><span class="line">    if (map !&#x3D; null) &#123;               &#x2F;&#x2F;map存在则插入自己和null，也就是说Entry可以允许值为null</span><br><span class="line">        map.set(this, value);</span><br><span class="line">    &#125; else &#123;</span><br><span class="line">        createMap(t, value);         &#x2F;&#x2F;否则创建map并插入</span><br><span class="line">    &#125;</span><br><span class="line">    if (this instanceof TerminatingThreadLocal) &#123;</span><br><span class="line">        TerminatingThreadLocal.register((TerminatingThreadLocal&lt;?&gt;) this);</span><br><span class="line">    &#125;</span><br><span class="line">    return value;      &#x2F;&#x2F;返回null</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>get（）方法也不难。。注释写的应该挺清楚了。当然还有个比较重要的remove方法，记得使用完ThreadLocal后调用（划重点！！）</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public void remove() &#123;</span><br><span class="line">         ThreadLocalMap m &#x3D; getMap(Thread.currentThread());</span><br><span class="line">         if (m !&#x3D; null) &#123;</span><br><span class="line">             m.remove(this);</span><br><span class="line">         &#125;</span><br><span class="line">     &#125;</span><br></pre></td></tr></table></figure>
+<p>remove方法主要就是在使用完ThreadLocal后，释放一些资源，以免造成内存泄漏，代码也不难～</p>
+<h1 id="内存泄漏的隐患"><a href="#内存泄漏的隐患" class="headerlink" title="内存泄漏的隐患"></a>内存泄漏的隐患</h1><p>ThreadLocal使用起来虽然很方便，但是用的不恰当的也会有风险，比如内存泄漏。所谓内存泄漏，是指程序中己动态分配的堆内存由于某种原因程序未释放或无法释放，造成系统内存的浪费，导致程序运行速度减慢甚至系统崩溃等严重后果。更直白一点，这个对象我们以后我们都用不到了，但是他还没有被垃圾回收掉。</p>
+<p>之前在说ThreadLocalMap中的Entry时，注意到Entry对ThreadLocal是弱引用。如果看过《深入理解Java虚拟机》的读者可能会在知道，如果一个对象只具有弱引用，那么这个对象就会被垃圾回收器GC掉(被弱引用所引用的对象只能生存到下一次GC之前，当发生GC时候，无论当前内存是否足够，弱引用所引用的对象都会被回收掉)。</p>
+<p>我们结合下面这张图来看看ThreadLocal内存泄漏是怎么产生的：</p>
+<p><img src="https://i.loli.net/2020/03/02/4WNC2IznovdTguj.jpg" alt="tl2.jpg"></p>
+<p>根据这张引用关系图我们可以看到，当虚拟机栈中的ThreadLocal引用失效后，由于Entry对ThreadLocal是弱引用，所以在垃圾回收的时候，可以回收掉ThreadLocal，此时Map中会存在Key为null但是Value不为null的Entry。如果线程一直不结束（比如使用了线程池），此时会存在一条强引用链：虚拟机栈中的Thread引用-&gt;Thread对象-&gt;ThreadLocalMap-&gt;Entry-&gt;Object对象。尽管这个Object对象我们不再使用，但是只要线程还在或者不采取其他措施，这个对象是无法回收的，这也就造成了内存泄漏。</p>
+<p>当然ThreadLocal并非没有预防措施，其思路在于把Key为null的Entry中，指向Object的强引用给掐掉，就可以了。事实上，在ThreadLocalMap中，每次新增、移除、获取的时候都会去擦除Key为Null的Value，但是这些措施并不能保证一定不会内存泄露,比如:使用了static修饰的ThreadLocal，延长了ThreadLocal的生命周期,可能会导致内存泄露；分配使用了ThreadLocal又不再调用get、set或者remove方法也会导致内存泄露等等。</p>
+<p>所以为了避免内存的泄露,每次使用完 ThreadLocal 的时候都需要调用 remove() 方法来擦除数据。</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>总的来说ThreadLocal以其巧妙的设计，实现了多线程环境下变量隔离的功能，在使用的时候我们还是需要养成用完过后remove的好习惯～</p>
+]]></content>
+      <categories>
+        <category>Java并发</category>
+      </categories>
+      <tags>
+        <tag>并发</tag>
+        <tag>原创</tag>
+        <tag>源码</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Java中的原子基本类型类</title>
+    <url>/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/</url>
+    <content><![CDATA[<p>Java从JDK1.5开始提供了java.util.concurrent.atomic包，这个包中当原子操作类提供了一种用法简单、性能高效、线程安全地更新一个变量的方式。变量的类型有很多，所以Atomic包下一共提供了13个类。本文主要以AtomicInteger为例，以小见大，对它的源码进行剖析，来明白原子类的实现原理。<br>阅读本文前，最好对volatile和CAS有一定了解，这方面可以请看上一篇文章。</p>
+<a id="more"></a>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>原子类顾名思义就是为了解决原子性操作问题的，我们借之前一个例子来讲解下</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class Atomic</span><br><span class="line">&#123;</span><br><span class="line">    private static volatile int num&#x3D;0; &#x2F;&#x2F;这是一个volatile修饰的共享变量，可以解决内存可见性</span><br><span class="line"></span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Thread t1&#x3D;new Thread(new Runnable() &#123; &#x2F;&#x2F;新启一个线程</span><br><span class="line">            public void run() &#123;</span><br><span class="line">                for (int i&#x3D;0;i&lt;1000;i++)&#123;</span><br><span class="line">                    num++;   &#x2F;&#x2F;对num进行自增1操作</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">        Thread t2&#x3D;new Thread(new Runnable() &#123; &#x2F;&#x2F;新启另一个线程</span><br><span class="line">            public void run() &#123;</span><br><span class="line">                for (int i&#x3D;0;i&lt;1000;i++)&#123;</span><br><span class="line">                    num++;   &#x2F;&#x2F;对num进行自增1操作</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">        t1.start(); &#x2F;&#x2F;启动这两个线程</span><br><span class="line">        t2.start();</span><br><span class="line">        Thread.sleep(1000);</span><br><span class="line">        System.out.println(num);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>最后的结果，num几乎不会出现等于2000的情况。原因我在此就不赘述了，可以看之前的那片文章——<a href="http://www.mybulinbulin.cn/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/" target="_blank" rel="noopener">传送门</a></p>
+<p>现在我们换成AtomicInteger试一下</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class Atomic &#123;</span><br><span class="line"></span><br><span class="line">    private static AtomicInteger atomicInteger&#x3D;new AtomicInteger(0);</span><br><span class="line"></span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            for(int i&#x3D;0;i&lt;1000;i++)&#123;</span><br><span class="line">                atomicInteger.getAndIncrement();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;).start();</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            for(int i&#x3D;0;i&lt;1000;i++)&#123;</span><br><span class="line">                atomicInteger.getAndIncrement();</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;).start();</span><br><span class="line"></span><br><span class="line">        Thread.sleep(1000);</span><br><span class="line">        System.out.println(atomicInteger.get());</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>运行这段代码大家可以看到,最终结果一定是正确的（不正确的话睡的时间长一点）。那么原子类是如何实现原子性的自增的呢？</p>
+<h1 id="AtomicInteger中的属性"><a href="#AtomicInteger中的属性" class="headerlink" title="AtomicInteger中的属性"></a>AtomicInteger中的属性</h1><p>我们先来看看AtomicInteger里面有什么，直接贴上源码：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F;Unsafe类</span><br><span class="line">private static final jdk.internal.misc.Unsafe U &#x3D; jdk.internal.misc.Unsafe.getUnsafe();</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;对象地址的偏移量</span><br><span class="line">private static final long VALUE &#x3D; U.objectFieldOffset(AtomicInteger.class, &quot;value&quot;);</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;变量值</span><br><span class="line">private volatile int value;</span><br></pre></td></tr></table></figure>
+<p>我们可以看到除了序列号意外，AtomicInteger中主要有三个属性，分别是：Unsafe类，long类型的对象地址的偏移量以及存储变量的value。</p>
+<ul>
+<li><p>变量值value：这个就是我们实际存储的int类型变量。注意这里用了volatile修饰，用于保证内存可见性。</p>
+</li>
+<li><p>Unsafe类：Unsafe是位于sun.misc包下的一个类，其主要功能是可用来直接访问系统内存资源并进行自主管理。Unsafe类使Java语言拥有了类似C语言指针一样操作内存空间的能力，这无疑也增加了程序发生相关指针问题的风险。在程序中过度、不正确使用Unsafe类会使得程序出错的概率变大，使得Java这种安全的语言变得不再“安全”（所以才叫Unsafe），因此官方其实是不建议使用的。在这里，我们对变量进行原子操作所依靠的就是这个Unsafe类。</p>
+</li>
+<li><p>对象地址的偏移量：可以理解对象在内存中存储的位置，Unsafe类主要是根据这个值来找到我们的对象来进行更改。</p>
+</li>
+</ul>
+<h1 id="常用的方法"><a href="#常用的方法" class="headerlink" title="常用的方法"></a>常用的方法</h1><p>我们来看看AtomicInteger中有哪些方法：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F;对当前值自增1，返回旧值</span><br><span class="line">public final int getAndIncrement() &#123;</span><br><span class="line">        return U.getAndAddInt(this, VALUE, 1);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;对当前值增加delta，返回旧值</span><br><span class="line">public final int getAndAdd(int delta) &#123;</span><br><span class="line">        return U.getAndAddInt(this, VALUE, delta);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;以原子方式设置为newValue的值，并返回旧值</span><br><span class="line">public final int getAndSet(int newValue) &#123;</span><br><span class="line">        return U.getAndSetInt(this, VALUE, newValue);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">&#x2F;&#x2F;如果输入的expectedValue等于预期值， 则以原子方式将该值设置为输入值，返回操作是否成功</span><br><span class="line">public final boolean compareAndSet(int expectedValue, int newValue) &#123;</span><br><span class="line">        return U.compareAndSetInt(this, VALUE, expectedValue, newValue);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>其他的一些方法大同小异，可能是返回新值，也有可能是进行减操作等等。我们需要关注的是他最终调用的方法。这些方法里最终调用的都是Unsafe类的方法，比如getAndAddInt，getAndSetInt，compareAndSetInt等等。原子操作的奥秘其实都在这些方法里。</p>
+<h1 id="底层实现"><a href="#底层实现" class="headerlink" title="底层实现"></a>底层实现</h1><p>我们以自增为例，看看调用U.getAndAddInt(this, VALUE, 1)发生了什么：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public final int getAndAddInt(Object o, long offset, int delta) &#123;</span><br><span class="line">    int v;</span><br><span class="line">    do &#123;</span><br><span class="line">        v &#x3D; getIntVolatile(o, offset);   &#x2F;&#x2F;调用native方法获取预期值</span><br><span class="line">    &#125; while (!weakCompareAndSetInt(o, offset, v, v + delta)); &#x2F;&#x2F;使用CAS进行原子操作，操作成功后跳出循环</span><br><span class="line">    return v;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">public final boolean weakCompareAndSetInt(Object o, long offset,</span><br><span class="line">                                          int expected,</span><br><span class="line">                                          int x) &#123;</span><br><span class="line">    return compareAndSetInt(o, offset, expected, x);  &#x2F;&#x2F;底层使用的是CAS</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>可以看到我们getAndAddInt方法使用死循环+CAS的方式来完成自增操作。具体流程如下：循环自旋不断尝试将一个比当前值大delta的新值赋给自己，如果失败则说明在执行”获取-设置”操作的时已经被其它线程修改过了，于是便再次进入循环下一次操作，直到成功为止。原子的将变量设定为新数据后，同时返回先前的旧数据。</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>其实Atomic类的操作明没有那么复杂，最底层依赖的还是自旋CAS，有好处也有坏处。从好的方面来讲，AtomicInteger类可以保持其原子性。但是从坏的方面来看，Usafe因为直接操作的底层地址，肯定不是那么安全，而且CAS机制也伴随着大量的问题，比如ABA问题，自旋时间长开销大等等。总的来说，还是要根据使用场合来选择合适的同步方式或者类。</p>
+]]></content>
+      <categories>
+        <category>Java并发</category>
+      </categories>
+      <tags>
+        <tag>并发</tag>
+        <tag>原创</tag>
+        <tag>源码</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>volatile和CAS</title>
+    <url>/2020/02/08/volatile%E5%92%8CCAS/</url>
+    <content><![CDATA[<p>在讲Java并发编程的时候，volatile关键字和CAS操作都扮演着重要的角色。本文之所以把这两个放在一起讲，是因为两者的有机结合能实现锁的功能。volatile能保证内存可见性和防止重排序，CAS能保证操作的原子性（其实也能保证可见性），两者结合几乎拓展出了整个Java的并发包，Java中Lock的底层实现AQS所依赖的也正是volatile和CAS。</p>
+<p>话不多说，现在让我们一起揭开它们的神秘面纱吧～</p>
+<a id="more"></a>
+
+<h1 id="volatile"><a href="#volatile" class="headerlink" title="volatile"></a>volatile</h1><p>volatile更像是轻量级的synchronized，它在多处理器开发中保证了共享变量的“内存可见性”。如果volatile变量修饰符使用恰当的话，它比synchronized的使用和执行成本更低，因为它没有加锁解锁的开销。</p>
+<h2 id="volatile的定义"><a href="#volatile的定义" class="headerlink" title="volatile的定义"></a>volatile的定义</h2><p>Java语言规范第3版中对volatile的定义如下：Java编程语言允许线程访问共享变量，为了确保共享变量能被准确和一致地更新，线程应该确保通过排他锁单独获得这个变量。Java语言提供了volatile，在某些情况下比锁要更加方便。如果一个字段被声明成volatile，Java内存模型能确保所有线程看到这个变量的值是一致的，即保证了内存可见性。</p>
+<h2 id="volatile的底层实现"><a href="#volatile的底层实现" class="headerlink" title="volatile的底层实现"></a>volatile的底层实现</h2><p>如果想知道volatile是如何保证内存可见性的，必然需要了解volatile的底层实现是什么。我们可以通过工具获取JIT编译器生成的汇编指令来查看对volatile进行写操作时，CPU会做些什么。</p>
+<p>在对有volatile修饰的共享变量进行写操作时，会在对应的汇编指令前加上Lock前缀。结合Java内存模型，我们可以这么理解：</p>
+<ol>
+<li>将当前工作内存中的共享变量（all）写回到主内存中去。</li>
+<li>步骤1会使得其他线程内的工作内存失效，后续读取共享变量必须从主内存中读取。</li>
+</ol>
+<p><img src="https://i.loli.net/2020/03/01/1rFnfOE3jT4Sx2h.jpg" alt="volatile.jpg"></p>
+<p>当然，实际情况下，这涉及到操作系统的总线嗅探机制和MESI协议，这边就不再扩展了，有兴趣可以自行了解下～</p>
+<h2 id="volatile的内存语义"><a href="#volatile的内存语义" class="headerlink" title="volatile的内存语义"></a>volatile的内存语义</h2><p>在学习《Java并发编程实战》这本书的时候，里面有句话令我印象十分的深刻。大致意思上说的是，比起内存可见性，volatile更重要的地方在于它的内存语义，使得它具有了一些锁的性质。</p>
+<p>volatile的语义主要是读和写，具体如下：</p>
+<ul>
+<li>volatile写：当写一个volatile变量时，JMM会把该线程对应的本地内存中的共享变量刷新到主内存。</li>
+<li>volatile读：当读一个volatile变量时，JMM会把该线程对应的本地内存置为无效。线程接下来将从主内存中读取共享变量。</li>
+</ul>
+<p>乍看之下好像就是保证内存可见性而已，没什么特殊的。其实这两句话我们得结合volatile另一个特性，也就是防止重排序来看。我们看下面这个例子：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class Volatile</span><br><span class="line">&#123;</span><br><span class="line">   static volatile int n&#x3D;0;</span><br><span class="line">   static boolean flag&#x3D;false;</span><br><span class="line"></span><br><span class="line">    public static boolean isFlag()&#123;</span><br><span class="line">        int x&#x3D;n;       &#x2F;&#x2F;3 </span><br><span class="line">        boolean res&#x3D;flag;&#x2F;&#x2F;4</span><br><span class="line">        return res;  </span><br><span class="line">    &#125;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        new Thread(()-&gt;&#123;</span><br><span class="line">            while(!isFlag())&#123;</span><br><span class="line">                </span><br><span class="line">            &#125;</span><br><span class="line">            System.out.println(&quot;over&quot;);</span><br><span class="line">        &#125;).start();</span><br><span class="line">        Thread.sleep(1000);</span><br><span class="line">        flag&#x3D;true;   &#x2F;&#x2F;1</span><br><span class="line">        n&#x3D;1;         &#x2F;&#x2F;2</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个例子其实在之前的文章中也出现过类似的，其主要逻辑是主线程sleep 1s后修改标志位，另一个线程跳出循环，程序终止。如果只是保证内存可见性的话，如果<strong>1</strong>和<strong>2</strong>发生重排序了，那么死循环的线程时无法感知到<strong>flag</strong>的变化的。volatile的内存语义能够保证<strong>1</strong>不会重排序到<strong>2</strong>之后，<strong>4</strong>不会重排序到<strong>3</strong>之前。表现出来的情况就是，A线程在写volatile变量时，之前所有的共享变量的值都将立即变得对B可见，B在读volatile变量时，之后所有的共享变量都时新值。</p>
+<p>我们会发现，其实volatile的写-读与锁的释放-获取有着相同的内存语义。但由于volatile仅仅保证对单个volatile变量的读/写具有原子性，而锁的互斥执行可以确保整个临界区代码的执行具有原子性。所以从功能上说，锁更强大；在可伸缩性和执行性能上，volatile更有优势。</p>
+<h2 id="volatile内存语义的实现原理"><a href="#volatile内存语义的实现原理" class="headerlink" title="volatile内存语义的实现原理"></a>volatile内存语义的实现原理</h2><p>在之前的文章中有提到过，编译器或者处理器为了提高运行效率会对指令进行重排序。为了实现volatile内存语义，编译器在声称字节码时，会在指令序列中插入内存屏障来紧致特定类型对处理器重排序。简单来说有下面四种：</p>
+<ol>
+<li>在每个volatile写操作的前面插入一个StoreStore屏障。</li>
+<li>在每个volatile写操作的后面插入一个StoreLoad屏障。</li>
+<li>在每个volatile读操作的后面插入一个LoadLoad屏障。</li>
+<li>在每个volatile读操作的后面插入一个LoadStore屏障。</li>
+</ol>
+<p>可能看图来说会比较直观一点，请看下图</p>
+<p><img src="https://i.loli.net/2020/03/02/QJBxqugDAsobh1e.jpg" alt="storestore.jpg"></p>
+<p>这样子可能会好理解吧。正因为禁止了部分的重排序，加上内存可见性的保证，所以保证了volatile类似于锁的内存语义。</p>
+<h1 id="CAS"><a href="#CAS" class="headerlink" title="CAS"></a>CAS</h1><p>CAS指的是Compare And Swap（在Java中调用的函数应该为CompareAndSet），顾名思义是比较并替换的意思。CAS实际上是乐观锁的一种实现，不需要对资源加锁，当我们需要更改变量时，需要一个旧的预期值A,主内存的值是B，要修改的值C，当且仅当A==B的时候，A的值才会被修改成C，而且是一个非阻塞性的原子操作。一般而言，Java中大部分都是通过循环和CAS配合来实现修改变量的。</p>
+<h2 id="CAS的实现原理"><a href="#CAS的实现原理" class="headerlink" title="CAS的实现原理"></a>CAS的实现原理</h2><p>我们可以追踪源码来看看CAS底层是如何实现的，以AtmoicInteger为例，其底层最终调用的方法为</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">@HotSpotIntrinsicCandidate</span><br><span class="line">public final native boolean compareAndSetInt(Object o, long offset,</span><br><span class="line">                                             int expected,</span><br><span class="line">                                             int x);</span><br></pre></td></tr></table></figure>
+<p>可以看到这是一个native方法，也就是说Java中的CAS底层是通过JNI去调用C代码操作OS来获取的一个原子操作，我们可以去openJDK查看这个指令的源码：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">&#x2F;&#x2F; Adding a lock prefix to an instruction on MP machine</span><br><span class="line">#define LOCK_IF_MP(mp) &quot;cmp $0, &quot; #mp &quot;; je 1f; lock; 1: &quot;</span><br><span class="line"></span><br><span class="line">inline jint     Atomic::cmpxchg    (jint     exchange_value, volatile jint*     dest, jint     compare_value) &#123;</span><br><span class="line">  int mp &#x3D; os::is_MP();</span><br><span class="line">  __asm__ volatile (LOCK_IF_MP(%4) &quot;cmpxchgl %1,(%3)&quot;</span><br><span class="line">                    : &quot;&#x3D;a&quot; (exchange_value)</span><br><span class="line">                    : &quot;r&quot; (exchange_value), &quot;a&quot; (compare_value), &quot;r&quot; (dest), &quot;r&quot; (mp)</span><br><span class="line">                    : &quot;cc&quot;, &quot;memory&quot;);</span><br><span class="line">  return exchange_value;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>我们可以看到，最终会调用底层的一个CMPXCHG指令。程序会根据当前处理器的类型来决定是否为CMPXCHG指令添加LOCK前缀。如果程序是在多处理器上运行，就为CMPXCHG指令加上LOCK前缀（LOCK CMPXCHG）。反之，如果程序是在单处理器上运行，就省略LOCK前缀。这个LOCK前缀上文讲过了，volatile也是靠他实现内存可见性的，所以文章开头提到的其实CAS也能保证内存可见性，原因在此。</p>
+<h2 id="CAS的三大问题"><a href="#CAS的三大问题" class="headerlink" title="CAS的三大问题"></a>CAS的三大问题</h2><p>CAS虽然很高效地解决了原子操作，但是CAS仍然存在三大问题。ABA问题，循环时间长开销大，以及只能保证一个共享变量的原子操作。</p>
+<ul>
+<li><p>ABA问题：当CPU1从缓存里面读到了数值A，另一个CPU2这时候也从缓存里面读到了A，然后将他主内存里面的值先修改成B，再将他修改成A，释放缓存锁，此时CPU1获取到缓存锁，去读主内存里面的值，发现还是A，判断相等修改新值，这在CPU1的线程里面看起来是没有任何改变，但实际上主内存里面这块地址的值已经有了一个A-&gt;B-&gt;A的改变，自从jdk1.5之后，加入了AtomicStampedReference类来防止这个问题，通过将引用和版本号作为一个tuple来防止ABA问题，那么修改结果就会变成1A-&gt;1B-&gt;2A，就能看到内存里面这个值的改变。</p>
+</li>
+<li><p>循环时间长开销大：CAS配合循环使用，就是不断重复通过执行CAS指令，直到成功为止，当长时间进行CAS的自旋的时候，会引起CPU资源的大量消耗。</p>
+</li>
+<li><p>只能保证一个共享变量的原子操作：当只有一个共享变量进行CAS操作的时候，就可以进行自旋的CAS去进行原子操作，但是对多个共享变量进行CAS操作的时候，循环CAS无法保证原子性。这时候我们可以取巧将这两个变量放在一个对象里面，比如说把一个int按照高16位低16位分别保存两个变量，那么就可以完整的对这个对象及其引用做一个原子操作。从Java1.5之后，JDK提供的AtomicReference类可以用来保证对象之间的原子性。</p>
+</li>
+</ul>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>volatile与CAS的配合我们在源码中会经常遇到，比如AQS、原子类等，所以深入了解这两个还是十分有必要的。后续也会写一些源码解析，当理解了volatile和CAS之后再去看源码，或许体验就不一样了～</p>
+]]></content>
+      <categories>
+        <category>Java并发</category>
+      </categories>
+      <tags>
+        <tag>并发</tag>
+        <tag>原创</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>synchronized的原理和使用</title>
+    <url>/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/</url>
+    <content><![CDATA[<p>之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。</p>
+<p>本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。</p>
+<a id="more"></a>
+
+<h1 id="Java中的锁机制"><a href="#Java中的锁机制" class="headerlink" title="Java中的锁机制"></a>Java中的锁机制</h1><p>Java中的锁有很多，按照功能、种类进行分类，主要包括以下几种：</p>
+<ol>
+<li>从线程是否需要对资源加锁可以分为 <strong>悲观锁</strong> 和 <strong>乐观锁</strong>。</li>
+<li>从锁的公平性进行区分，可以分为 <strong>公平锁</strong> 和 <strong>非公平锁</strong>。</li>
+<li>从根据锁是否重复获取可以分为 可 <strong>重入锁</strong> 和 <strong>不可重入锁</strong>。</li>
+<li>从那个多个线程能否获取同一把锁分为 <strong>共享锁</strong> 和 <strong>排他锁</strong>。</li>
+</ol>
+<p>而Java中的锁的具体实现主要有JVM提供的关键字synchronized和Java并发包下的Lock。</p>
+<p>本文中介绍的synchronized如果按照上面的分类的话，应当属于 <strong>悲观锁、非公平锁、重入锁、排他锁</strong>。</p>
+<h1 id="synchronized如何使用"><a href="#synchronized如何使用" class="headerlink" title="synchronized如何使用"></a>synchronized如何使用</h1><p>首先，我们来看看synchronized如何使用的。synchronized实现同步的基础是：Java中的每一个对象都可以作为锁。在使用的时候，主要有以下几种使用方式：</p>
+<ol>
+<li>修饰实例方法，作用于当前对象实例加锁，进入同步代码前要获得当前对象实例的锁</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public synchronized void xxx()&#123;</span><br><span class="line">        &#x2F;&#x2F;省略号</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<ol start="2">
+<li>修饰静态方法，作用于当前类对象加锁，进入同步代码前要获得当前类对象的锁 </li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public static synchronized void xxx()&#123;</span><br><span class="line">        &#x2F;&#x2F;省略号</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<ol start="3">
+<li>修饰代码块，指定加锁对象，对给定对象加锁，进入同步代码块前要获得给定对象的锁</li>
+</ol>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">Object lock&#x3D;new Object();</span><br><span class="line"></span><br><span class="line">synchronized (lock)&#123;</span><br><span class="line">    &#x2F;&#x2F;省略号</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>当一个线程试图访问同步代码块或者同步方法时，它必须先得到锁，退出或者抛出异常时必须释放锁。</p>
+<p>现在我们从三大问题的角度来看，结合Java内存模型，看看synchronized是如何解决的：</p>
+<ul>
+<li><p>内存可见性：在进入同步代码块或者同步方法时，线程需要获取锁，JMM会把线程对应的工作内存置为无效。从而使得后续的共享变量必须从主内存中读取；在锁释放的时候，JMM会把线程对应的本地内存中的共享变量刷新到主内存中去。由于synchronized是排他锁，同一时刻，只有一个相关线程可以拿到对象上的锁，所以当每个线程执行时都会得到最新的变量，而执行完成后都会刷新主内存，因此能保证内存的可见性。</p>
+</li>
+<li><p>原子性：同步代码块或者同步方法的原子性并不是严格意义上的不可分割，事实上，在同步代码执行的过程中，也有可能被其他不相关的线程抢占。但是其他线程的运行结果并不影响持有锁的线程（如果有影响就要检查一下是否正确加锁了。。。）。同步代码原子性的保证，来自于其排他锁的性质。</p>
+</li>
+<li><p>重排序：同步代码块或者同步方法能够保证同步区域中的代码不跑到临界区外，<strong>但是不能保证同步区域内的代码不发生重排序（划重点！！）</strong>，如果说同步区域内的代码重排序，不影响后续线程的执行结果，那还好。但一旦出现这种情况，那么隐患还是相当大的，比如说单例模式的双重检查锁，需要靠volatile来修饰变量防止重排序。</p>
+</li>
+</ul>
+<h1 id="Mark-Word"><a href="#Mark-Word" class="headerlink" title="Mark Word"></a>Mark Word</h1><p>之前说了很久的锁，那么Java中的对象锁是如何实现的？或者说，锁到底存放在哪里？</p>
+<p>在《深入理解Java虚拟机一书中》，我们可以知道，对象在内存中的布局分为三块区域：对象头、实例数据和对齐填充。Hotspot虚拟机的对象头主要包括两部分数据：Mark Word（标记字段）、Klass Pointer（类型指针），数组会多1字宽(32位: 4字节)来存储数组长度。</p>
+<p>synchronized用到的锁就是存在Java对象头当中的。其中Klass Point是对象指向它的类元数据的指针，虚拟机通过这个指针来确定这个对象是哪个类的实例；Mark Word用于存储对象自身的运行时数据，它是实现轻量级锁和偏向锁的关键。</p>
+<p>Mark Word主要用来存储对象自身的运行时数据，如hashcode、gc分代年龄、锁状态标志、线程持有的锁、偏向线程 ID、偏向时间戳等等。mark word的位长度为JVM的一个Word大小，也就是说32位JVM的Mark word为32位，64位JVM为64位。在运行期间，Mark Word里存储的数据会随着锁标志位的变化而变化。我们来看看它具体的结构和状态变化（以32位虚拟机为例）：</p>
+<table>
+<thead>
+<tr>
+<th align="center">锁状态</th>
+<th align="center">30bit</th>
+<th align="center">2bit锁标志位</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">无锁状态</td>
+<td align="center">对象的hashCode:25bit 对象分代年龄:4bit 是否是偏向锁:0</td>
+<td align="center">01</td>
+</tr>
+<tr>
+<td align="center">轻量级锁</td>
+<td align="center">指向栈中锁记录的指针</td>
+<td align="center">00</td>
+</tr>
+<tr>
+<td align="center">重量级锁</td>
+<td align="center">指向互斥量的指针</td>
+<td align="center">10</td>
+</tr>
+<tr>
+<td align="center">GC标记</td>
+<td align="center">空</td>
+<td align="center">11</td>
+</tr>
+<tr>
+<td align="center">偏向锁</td>
+<td align="center">线程ID:23bit 时间戳:2bit 对象分代年龄:4bit 是否是偏向锁:1</td>
+<td align="center">01</td>
+</tr>
+</tbody></table>
+<h1 id="Monitor机制"><a href="#Monitor机制" class="headerlink" title="Monitor机制"></a>Monitor机制</h1><p>在了解了锁的概念后，Java中又是如何实现同步获取锁的呢？这不得不提到Monitor机制，Monitor其实是一种同步工具、同步机制，在Java中，Object 类本身就是监视者对象，Java 对于 Monitor Object 模式做了内建的支持，即每一个Java对象是天生的Monitor，每一个Java对象都有成为Monitor的潜质。并且同时只能有一个线程可以获得该对象monitor的所有权。在线程进入时通过monitorenter尝试取得对象monitor所有权，退出时通过monitorexit释放对象monitor所有权。</p>
+<ul>
+<li><p><strong>monitorenter</strong>过程如下：<br>如果<strong>monitor</strong>的进入数为0，则该线程进入<strong>monitor</strong>，然后将进入数设置为1，该线程即为<strong>monitor</strong>的所有者；<br>如果线程已经占有<strong>monitor</strong>，只是重新进入，则<strong>monitor</strong>的进入数+1（这也是重入锁的实现原理）；<br>如果其他线程已经占用<strong>monitor</strong>，则该线程处于阻塞状态，直至<strong>monitor</strong>的进入数为0，再重新尝试获得<strong>monitor</strong>的所有权。</p>
+</li>
+<li><p><strong>monitorexit</strong>过程如下：<br>执行<strong>monitorexit</strong>的线程必须是 object 所对应的<strong>monitor</strong>的所有者。执行指令时，<strong>monitor</strong>的进入数减1，如果减1后进入数为0，则线程退出 <strong>monitor</strong>，不再是这个<strong>monitor</strong>的所有者，其他被这个<strong>monitor</strong>阻塞的线程可以尝试获取这个<strong>monitor</strong>的所有权。</p>
+</li>
+</ul>
+<h1 id="锁的底层优化"><a href="#锁的底层优化" class="headerlink" title="锁的底层优化"></a>锁的底层优化</h1><p>在Java早期版本中，synchronized属于重量级锁，效率低下，因为monitor是依赖于底层的操作系统的Mutex Lock来实现的，Java的线程是映射到操作系统的原生线程之上的。如果要挂起或者唤醒一个线程，都需要操作系统帮忙完成，而操作系统实现线程之间的切换时需要从用户态转换到内核态，这个状态之间的转换需要相对比较长的时间，时间成本相对较高，这也是为什么早期的synchronized效率低的原因。</p>
+<p>JDK1.6对锁的实现引入了大量的优化，如偏向锁、轻量级锁、自旋锁、适应性自旋锁、锁消除、锁粗化等技术来减少锁操作的开销。</p>
+<h2 id="锁升级"><a href="#锁升级" class="headerlink" title="锁升级"></a>锁升级</h2><p>锁主要存在四中状态，依次是：无锁状态、偏向锁状态、轻量级锁状态、重量级锁状态，他们会随着竞争的激烈而逐渐升级。注意锁可以升级不可降级，这种策略是为了提高获得锁和释放锁的效率。</p>
+<h3 id="1-重量级锁"><a href="#1-重量级锁" class="headerlink" title="1.重量级锁"></a>1.重量级锁</h3><p>monitor监视器锁本质上是依赖操作系统的Mutex Lock互斥量 来实现的，我们一般称之为重量级锁。因为OS实现线程间的切换需要从用户态转换到内核态，这个转换过程成本较高，耗时相对较长，因此synchronized效率会比较低。 </p>
+<h3 id="2-轻量级锁"><a href="#2-轻量级锁" class="headerlink" title="2.轻量级锁"></a>2.轻量级锁</h3><p>轻量级锁，其性能提升的依据是对于绝大部分的锁，在整个生命周期内都是不会存在竞争的，如果没有竞争，轻量级锁就可以使用CAS操作（乐观锁的一种实现，可以线程安全的修改变量，后续文章会讲到）避免互斥量的开销，从而提升效率。我们来看一下轻量级锁的获取和释放流程：</p>
+<ul>
+<li>轻量级锁的获取：</li>
+</ul>
+<ol>
+<li>线程在进入到同步代码块的时候，JVM 会先在当前线程的栈帧中建立一个名为锁记录（Lock Record）的空间，用于存储锁对象当前Mark Word的拷贝（官方称为 Displaced Mark Word），owner 指针指向对象的 Mark Word。如图所示</li>
+</ol>
+<p><img src="https://i.loli.net/2020/03/01/Nqvr4hlWdV26Xs5.jpg" alt="simpleLock.jpg"></p>
+<ol start="2">
+<li><p>JVM使用CAS操作尝试将对象头中的Mark Word更新为指向Lock Record的指针。如果更新成功，则执行步骤3；更新失败，则执行步骤4。</p>
+</li>
+<li><p>如果更新成功，那么这个线程就拥有了该对象的锁，对象的Mark Word的锁状态为轻量级锁（标志位转变为’00’）。此时线程堆栈与对象头的状态如图所示</p>
+</li>
+</ol>
+<p><img src="https://i.loli.net/2020/03/01/Aper9L3jV4F8Is2.jpg" alt="simpleLock2.jpg"></p>
+<ol start="4">
+<li>如果更新失败，JVM首先检查对象的Mark Word是否指向当前线程的栈帧。如果是，就说明当前线程已经拥有了该对象的锁，那就可以直接进入同步代码块继续执行；如果不是，就说明这个锁对象已经被其他的线程抢占了，当前线程会尝试自旋一定次数来获取锁。如果自旋一定次数CAS操作仍没有成功，那么轻量级锁就要升级为重量级锁（锁的标志位转变为’10’），Mark Word 中存储的就是指向重量级锁的指针，后面等待锁的线程也就进入阻塞状态。</li>
+</ol>
+<ul>
+<li>轻量级锁的释放：<br>通过CAS操作用线程中复制的DisplacedMark Word中的数据替换对象当前的Mark Word。如果替换成功，说明整个同步过程就完成了；如果替换失败，说明有其他线程尝试过获取该锁，并且此时锁已经是重量级锁，那就在释放锁的同时，唤醒被挂起的线程。</li>
+</ul>
+<h3 id="3-偏向锁"><a href="#3-偏向锁" class="headerlink" title="3.偏向锁"></a>3.偏向锁</h3><p>在一些情况下总是同一线程多次获得锁，此时第二次再重新做CAS修改对象头中的Mark Word这样的操作，有些多余。所以就有了偏向锁，只需要检查是否为偏向锁、锁标识为以及线程ID即可，只要是同一线程就不再修改对象头。其目的为了在无多线程竞争的情况下尽量减少不必要的轻量级锁执行路径。</p>
+<ul>
+<li>偏向锁的获取：</li>
+</ul>
+<ol>
+<li>检测Mark Word是否为可偏向状态，即是否为偏向锁1，锁标识位为01。</li>
+<li>若为可偏向状态，则测试线程ID是否为当前线程ID，如果是，则执行步骤（5），否则执行步骤（3）。</li>
+<li>如果线程ID不为当前线程ID，则通过CAS操作竞争锁，竞争成功，则将Mark Word的线程ID替换为当前线程ID，否则执行步骤（4）。</li>
+<li>通过CAS竞争锁失败，证明当前存在多线程竞争情况，当到达全局安全点，获得偏向锁的线程被挂起，偏向锁升级为轻量级锁，然后被阻塞在安全点的线程继续往下执行同步代码块。</li>
+<li>执行同步代码块。</li>
+</ol>
+<ul>
+<li>偏向锁的释放</li>
+</ul>
+<ol>
+<li>当一个线程已经持有偏向锁，而另外一个线程尝试竞争偏向锁时，CAS替换线程ID操作失败，则开始撤销偏向锁。偏向锁的撤销，需要等待原持有偏向锁的线程到达全局安全点（在这个时间点上没有字节码正在执行），暂停该线程，并检查其状态。</li>
+<li>如果原持有偏向锁的线程不处于活动状态或已退出同步代码块，则该线程释放锁。将对象头设置为无锁状态（锁标志位为’01’，是否偏向标志位为’0’）。</li>
+<li>如果原持有偏向锁的线程未退出同步代码块，则升级为轻量级锁（锁标志位为’00’）</li>
+</ol>
+<h2 id="其他优化"><a href="#其他优化" class="headerlink" title="其他优化"></a>其他优化</h2><h3 id="锁消除"><a href="#锁消除" class="headerlink" title="锁消除"></a>锁消除</h3><p>锁消除理解起来很简单，它指的就是虚拟机即使编译器在运行时，如果检测到那些共享数据不可能存在竞争，那么就执行锁消除。锁消除可以节省毫无意义的请求锁的时间。</p>
+<h3 id="锁粗化"><a href="#锁粗化" class="headerlink" title="锁粗化"></a>锁粗化</h3><p>锁粗化就是 JVM 检测到一串零碎的操作都对同一个对象加锁，则会把加锁同步的范围粗化到整个操作序列的外部。</p>
+<h1 id="注意事项"><a href="#注意事项" class="headerlink" title="注意事项"></a>注意事项</h1><p>synchronized虽然能解决并发问题，但是也不能乱用。一方面过多的加锁会影响系统的性能，如果只需要保证内存可见性的话，用volatile效率会更高；另一方面如果锁加的不规范可能会导致死锁的发生。</p>
+<p>但是即使我们正确的使用锁了，如果同步代码写的不好，也有一些隐患，请看下面这个例子：</p>
+<figure class="highlight plain"><table><tr><td class="code"><pre><span class="line">public class Syn</span><br><span class="line">&#123;</span><br><span class="line">    public static void main(String[] args) throws InterruptedException &#123;</span><br><span class="line">        Object lock&#x3D;new Object();</span><br><span class="line">       Thread t1&#x3D; new Thread(()-&gt;&#123;</span><br><span class="line">            synchronized (lock)&#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                    System.out.println(&quot;thread 1 : &quot;+Thread.currentThread().isInterrupted());</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">       Thread t2&#x3D; new Thread(()-&gt;&#123;</span><br><span class="line">            synchronized (lock)&#123;</span><br><span class="line">                try &#123;</span><br><span class="line">                    lock.wait();</span><br><span class="line">                    System.out.println(&quot;thread 2 : &quot;+Thread.currentThread().isInterrupted());</span><br><span class="line">                &#125; catch (InterruptedException e) &#123;</span><br><span class="line">                    e.printStackTrace();</span><br><span class="line">                &#125;</span><br><span class="line"></span><br><span class="line">            &#125;</span><br><span class="line">        &#125;);</span><br><span class="line">       t1.start();</span><br><span class="line">       t2.start();</span><br><span class="line"></span><br><span class="line">       Thread.sleep(1000);</span><br><span class="line">       synchronized (lock)&#123;</span><br><span class="line">           t1.interrupt();</span><br><span class="line">           lock.notifyAll();</span><br><span class="line">       &#125;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>从代码的层面来看，最终结果应当是线程t1抛出异常，线程t2继续执行。但是事实真的如此吗？大家可以尝试一下～</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>synchronized是Java中十分重要的一个关键字，短短一篇文章很难把它说透彻。我也只不过是粗略的介绍了一下它的基本使用和原理，如有说的不对的地方，还请大家多多包涵hhhh～</p>
+]]></content>
+      <categories>
+        <category>Java并发</category>
+      </categories>
+      <tags>
+        <tag>并发</tag>
+        <tag>原创</tag>
+      </tags>
+  </entry>
+  <entry>
     <title>内存可见性、原子性和重排序</title>
-    <url>/2020/02/29/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</url>
+    <url>/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</url>
     <content><![CDATA[<p>在上一篇文章中，笔者简单介绍了下<a href="https://karthurl.github.io/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/" target="_blank" rel="noopener">Java内存模型</a>。本文承接上文，主要以代码+图片的形式呈现给大家，其主要目的是让大家对于并发程序中的内存可见性、原子性以及重排序有一定的了解。这三个问题也是并发程序为什么难写的原因。</p>
 <a id="more"></a>
 <h1 id="内存可见性"><a href="#内存可见性" class="headerlink" title="内存可见性"></a>内存可见性</h1><p>在说明什么是内存可见性之前，大家可以尝试运行下面的代码，看看结果如何。</p>
@@ -73,7 +456,7 @@
   </entry>
   <entry>
     <title>Java内存模型</title>
-    <url>/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/</url>
+    <url>/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/</url>
     <content><![CDATA[<p>本文从Java内存模型开始，通过对内存模型的理解让大家对于并发中的内存可见性、原子性和重排序有一些自己的想法，为后续的Java并发编程打下基础。</p>
 <p>阅读本文前，需要有一定的Java基础，最好还有一定的并发编程基础。</p>
 <a id="more"></a>
@@ -118,23 +501,5 @@
         <tag>并发</tag>
         <tag>原创</tag>
       </tags>
-  </entry>
-  <entry>
-    <title>Hello World</title>
-    <url>/2020/02/28/hello-world/</url>
-    <content><![CDATA[<p>Welcome to <a href="https://hexo.io/" target="_blank" rel="noopener">Hexo</a>! This is your very first post. Check <a href="https://hexo.io/docs/" target="_blank" rel="noopener">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a href="https://hexo.io/docs/troubleshooting.html" target="_blank" rel="noopener">troubleshooting</a> or you can ask me on <a href="https://github.com/hexojs/hexo/issues" target="_blank" rel="noopener">GitHub</a>.</p>
-<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo new <span class="string">"My New Post"</span></span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/writing.html" target="_blank" rel="noopener">Writing</a></p>
-<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/server.html" target="_blank" rel="noopener">Server</a></p>
-<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/generating.html" target="_blank" rel="noopener">Generating</a></p>
-<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
-
-<p>More info: <a href="https://hexo.io/docs/one-command-deployment.html" target="_blank" rel="noopener">Deployment</a></p>
-]]></content>
   </entry>
 </search>
