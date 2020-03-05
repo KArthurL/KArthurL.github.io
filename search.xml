@@ -50,8 +50,8 @@
         <category>集合</category>
       </categories>
       <tags>
-        <tag>原创</tag>
         <tag>集合</tag>
+        <tag>原创</tag>
         <tag>方法</tag>
       </tags>
   </entry>
@@ -263,9 +263,9 @@
         <category>规范</category>
       </categories>
       <tags>
+        <tag>集合</tag>
         <tag>原创</tag>
         <tag>源码</tag>
-        <tag>集合</tag>
         <tag>规范</tag>
       </tags>
   </entry>
@@ -310,9 +310,9 @@
         <category>集合</category>
       </categories>
       <tags>
+        <tag>集合</tag>
         <tag>原创</tag>
         <tag>源码</tag>
-        <tag>集合</tag>
       </tags>
   </entry>
   <entry>
@@ -348,9 +348,9 @@
         <category>集合</category>
       </categories>
       <tags>
+        <tag>集合</tag>
         <tag>原创</tag>
         <tag>源码</tag>
-        <tag>集合</tag>
       </tags>
   </entry>
   <entry>
@@ -627,8 +627,8 @@
         <category>规范</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
+        <tag>并发</tag>
         <tag>规范</tag>
       </tags>
   </entry>
@@ -677,9 +677,9 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
         <tag>源码</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
   <entry>
@@ -719,9 +719,9 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
         <tag>源码</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
   <entry>
@@ -783,8 +783,8 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
   <entry>
@@ -929,8 +929,8 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
   <entry>
@@ -1000,8 +1000,8 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
   <entry>
@@ -1048,8 +1048,8 @@
         <category>Java并发</category>
       </categories>
       <tags>
-        <tag>并发</tag>
         <tag>原创</tag>
+        <tag>并发</tag>
       </tags>
   </entry>
 </search>
