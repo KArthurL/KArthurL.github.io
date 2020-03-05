@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>
+    浮点数与BigDecimal |  愿那颗星星一直指引你
+  </title>
+  <meta name="generator" content="hexo-theme-yilia-plus">
+  
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+<script src="/js/pace.min.js"></script>
+
+
+  
+
+  
+
+<link rel="alternate" href="/atom.xml" title="愿那颗星星一直指引你" type="application/atom+xml">
+</head>
+
+</html>
+
+<body>
+  <div id="app">
+    <main class="content">
+      <section class="outer">
+  <article id="post-浮点数与BigDecimal" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h1 class="article-title sea-center" style="border-left:0" itemprop="name">
+  浮点数与BigDecimal
+</h1>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/02/13/%E6%B5%AE%E7%82%B9%E6%95%B0%E4%B8%8EBigDecimal/" class="article-date">
+  <time datetime="2020-02-13T15:08:34.000Z" itemprop="datePublished">2020-02-13</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E8%A7%84%E8%8C%83/">规范</a>
+  </div>
+
+      
+      
+<div class="word_count">
+    <span class="post-time">
+        <span class="post-meta-item-icon">
+            <i class="ri-quill-pen-line"></i>
+            <span class="post-meta-item-text"> 字数统计:</span>
+            <span class="post-count">1.2k字</span>
+        </span>
+    </span>
+
+    <span class="post-time">
+        &nbsp; | &nbsp;
+        <span class="post-meta-item-icon">
+            <i class="ri-book-open-line"></i>
+            <span class="post-meta-item-text"> 阅读时长≈</span>
+            <span class="post-count">4分钟</span>
+        </span>
+    </span>
+</div>
+
+      
+    </div>
+    
+
+    
+    
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>在之前写软件的时候出现过这样一种情况，软件界面在显示位移的时候，经常会出现类似于1.9999999964这样子的小数。当时可真是百思不得其解呀，到底问题出在哪？</p>
+<p>后来才知道，我在计算位移的时候使用的浮点数，而浮点数是存在精度损失的。后来我把浮点数换成了BigDecimal，问题就解决了。这篇文章也算是记录下自己所踩的坑。</p>
+<a id="more"></a>
+<h1 id="浮点数的存储"><a href="#浮点数的存储" class="headerlink" title="浮点数的存储"></a>浮点数的存储</h1><p>Java中的浮点数主要有float和double两类，众所周知，float占据4字节，double占据8字节，我们来看看这两种类型是怎么存储数据的。</p>
+<h2 id="float"><a href="#float" class="headerlink" title="float"></a>float</h2><table>
+<thead>
+<tr>
+<th align="center">符号位：1bit</th>
+<th align="center">指数位：8bit</th>
+<th align="center">尾数位：23bit</th>
+</tr>
+</thead>
+</table>
+<h2 id="double"><a href="#double" class="headerlink" title="double"></a>double</h2><table>
+<thead>
+<tr>
+<th align="center">符号位：1bit</th>
+<th align="center">指数位：11bit</th>
+<th align="center">尾数位：52bit</th>
+</tr>
+</thead>
+</table>
+<h2 id="举例说明"><a href="#举例说明" class="headerlink" title="举例说明"></a>举例说明</h2><p>我们以89.625f作为例子来说明计算机中浮点数是怎么储存的。在对十进制浮点数进行转换的时候，需要将整数部分和小数部分分开处理。</p>
+<ul>
+<li><p>整数部分：十进制89转化成二进制为10110012。</p>
+</li>
+<li><p>小数部分：十进制小数转二进制数的步骤是“乘以2取整，顺序排列”。所以0.625转化为二进制小数为0.101，具体步骤如下：</p>
+</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th align="center">乘数</th>
+<th align="center">*</th>
+<th align="center">乘数</th>
+<th align="center">=</th>
+<th align="center">积</th>
+<th align="center">整数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0.625</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1.25</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0.25（此处是1.25的小数部分）</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">0.5</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0.5</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1</td>
+<td align="center">1</td>
+</tr>
+</tbody></table>
+<ul>
+<li>转换结果：89.625（10）=1011001.101（2）</li>
+<li>存储方式：</li>
+</ul>
+<ol>
+<li>符号位：因为是正数，所以为0。</li>
+<li>指数为：因为采用科学计数法，所以小数点左边只能留一位且必须为1，所以为1.1011001101*2^6，规定指数位的底为2且幂加127（double类型加1023），所以指数位为133(127+6)，转换为二进制为10000101。</li>
+<li>尾数位： 规定尾数位去掉规范化前边的整数位的1，只保存小数，所以尾数位为011001101</li>
+</ol>
+<p>所以我们最终得到的浮点数为：</p>
+<table>
+<thead>
+<tr>
+<th align="center">符号位：1bit</th>
+<th align="center">指数位：8bit</th>
+<th align="center">尾数位：23bit</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0</td>
+<td align="center">10000101</td>
+<td align="center">01100110100000000000000</td>
+</tr>
+</tbody></table>
+<h1 id="浮点数的缺陷"><a href="#浮点数的缺陷" class="headerlink" title="浮点数的缺陷"></a>浮点数的缺陷</h1><p>有了前面的铺垫，我们大概可能猜到浮点数的问题出在哪里了。主要问题就出在小数部分转二进制这一步。</p>
+<p>我们以0.9为例：</p>
+<table>
+<thead>
+<tr>
+<th align="center">乘数</th>
+<th align="center">*</th>
+<th align="center">乘数</th>
+<th align="center">=</th>
+<th align="center">积</th>
+<th align="center">整数</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">0.9</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1.8</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0.8</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1.6</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0.6</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1.2</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">0.2</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">0.4</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0.4</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">0.8</td>
+<td align="center">0</td>
+</tr>
+<tr>
+<td align="center">0.8</td>
+<td align="center">*</td>
+<td align="center">2</td>
+<td align="center">=</td>
+<td align="center">1.6</td>
+<td align="center">1</td>
+</tr>
+<tr>
+<td align="center">……</td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+</tr>
+</tbody></table>
+<p>上面的计算过程循环了，也就是说*2永远不可能消灭小数部分，这样算法将无限下去。很显然，小数的二进制表示有时是不可能精确的。超出的部分必须对其截断，造成了部分精度的丢失。</p>
+<p>我们来直观的感受下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>&#123;</span><br><span class="line">    <span class="keyword">float</span> f = <span class="number">0.9f</span>-<span class="number">0.8f</span>;    <span class="comment">//0.9-0.8=0.1？</span></span><br><span class="line">    System.out.println(f);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">运行结果：<span class="number">0.099999964</span></span><br></pre></td></tr></table></figure>
+<h1 id="BigDecimal简介"><a href="#BigDecimal简介" class="headerlink" title="BigDecimal简介"></a>BigDecimal简介</h1><p>Java在java.math包中提供的API类BigDecimal，用来对数字进行<strong>精确</strong>的运算，这意味着BigDecimal不会像浮点数一样丢失精度。我也是从《Effective Java》一书中学习到的，在进行工程计算时，误差允许的情况下，推荐使用浮点数，因为其计算效率更高；但是如果要求数字十分精确，不允许有误差的时候，比如货币，推荐使用BigDecimal。</p>
+<h2 id="常用的构造函数"><a href="#常用的构造函数" class="headerlink" title="常用的构造函数"></a>常用的构造函数</h2><ol>
+<li><p>BigDecimal(int)：创建一个具有参数所指定整数值的对象</p>
+</li>
+<li><p>BigDecimal(double)：创建一个具有参数所指定双精度值的对象</p>
+</li>
+<li><p>BigDecimal(long)：创建一个具有参数所指定长整数值的对象</p>
+</li>
+<li><p>BigDecimal(String)：创建一个具有参数所指定以字符串表示的数值的对象  （建议使用！）</p>
+</li>
+</ol>
+<p>通常情况下而言，推荐使用String构造方法，因为其完全是可预知的：写入 newBigDecimal(“0.1”) 将创建一个 BigDecimal，它正好等于预期的0.1。</p>
+<p>请看下面这个例子：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">main</span><span class="params">(String[] args)</span></span>&#123;</span><br><span class="line"></span><br><span class="line">    BigDecimal bigDecimal1=<span class="keyword">new</span> BigDecimal(<span class="number">0.1</span>);</span><br><span class="line">    BigDecimal bigDecimal2=<span class="keyword">new</span> BigDecimal(<span class="string">"0.1"</span>);</span><br><span class="line">    System.out.println(bigDecimal1);</span><br><span class="line">    System.out.println(bigDecimal2);</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">运行结果:<span class="number">0.1000000000000000055511151231257827021181583404541015625</span></span><br><span class="line">        <span class="number">0.1</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="计算方法"><a href="#计算方法" class="headerlink" title="计算方法"></a>计算方法</h2><p>因为BigDecimal本身是一个对象，所以我们不能对其直接进行运算符操作，而需要调用对应的方法。</p>
+<ul>
+<li>加法：add(BigDecimal augend)</li>
+<li>减法：subtract(BigDecimal subtrahend)</li>
+<li>乘法：multiply(BigDecimal multiplicand)</li>
+<li>除法：divide(BigDecimal divisor, int scale, int roundingMode)</li>
+</ul>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>关于BigDecimal的用法其实还有很多，这边就不具体展开了，感兴趣的朋友可以深入了解下～。其实对于浮点数和BigDecimal这两者而言，我们具体选择哪一个，更多的还是看我们的使用场景，切忌为了用而用，比如我非要用BigDecimal去解方程这样子，那就有点南辕北辙了。在使用一个技术前，我们还是需要思考一下，为什么要用。</p>
+
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+        <div class="declare">
+          <ul class="post-copyright">
+            <li>
+              <i class="ri-copyright-line"></i>
+              <strong>版权声明： </strong s>
+              本博客所有文章除特别声明外，均采用 <a href="https://www.apache.org/licenses/LICENSE-2.0.html" rel="external nofollow"
+                target="_blank">Apache License 2.0</a> 许可协议。转载请注明出处！
+            </li>
+          </ul>
+        </div>
+        
+    <footer class="article-footer">
+      
+          
+<div class="share-btn">
+      <span class="share-sns share-outer">
+        <i class="ri-share-forward-line"></i>
+        分享
+      </span>
+      <div class="share-wrap">
+        <i class="arrow"></i>
+        <div class="share-icons">
+          
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="ri-weibo-fill"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="ri-wechat-fill"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="ri-qq-fill"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="ri-douban-line"></i>
+          </a>
+          <!-- <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a> -->
+          
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="ri-facebook-circle-fill"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="ri-twitter-fill"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="ri-google-fill"></i>
+          </a>
+        </div>
+      </div>
+</div>
+
+<div class="wx-share-modal">
+    <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://yoursite.com/2020/02/13/%E6%B5%AE%E7%82%B9%E6%95%B0%E4%B8%8EBigDecimal/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div id="share-mask"></div>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E8%A7%84%E8%8C%83/" rel="tag">规范</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+  
+  <nav class="article-nav">
+    
+      <a href="/2020/02/15/HashMap%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" class="article-nav-link">
+        <strong class="article-nav-caption">上一篇</strong>
+        <div class="article-nav-title">
+          
+            HashMap源码解析
+          
+        </div>
+      </a>
+    
+    
+      <a href="/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/" class="article-nav-link">
+        <strong class="article-nav-caption">下一篇</strong>
+        <div class="article-nav-title">为什么阿里巴巴手册中禁用默认实现的线程池</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+  
+<!-- valine评论 -->
+<div id="vcomments-box">
+    <div id="vcomments">
+    </div>
+</div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        app_id: '',
+        app_key: '',
+        path: window.location.pathname,
+        notify: 'false',
+        verify: 'false',
+        avatar: 'mp',
+        placeholder: '给我的文章加点评论吧~',
+        recordIP: true
+    });
+    const infoEle = document.querySelector('#vcomments .info');
+    if (infoEle && infoEle.childNodes && infoEle.childNodes.length > 0) {
+        infoEle.childNodes.forEach(function (item) {
+            item.parentNode.removeChild(item);
+        });
+    }
+</script>
+<style>
+    #vcomments-box {
+        padding: 5px 30px;
+    }
+
+    @media screen and (max-width: 800px) {
+        #vcomments-box {
+            padding: 5px 0px;
+        }
+    }
+
+    #vcomments-box #vcomments {
+        background-color: #fff;
+    }
+
+    .v .vlist .vcard .vh {
+        padding-right: 20px;
+    }
+
+    .v .vlist .vcard {
+        padding-left: 10px;
+    }
+</style>
+
+  
+
+  
+  
+  
+
+</article>
+</section>
+      <footer class="footer">
+  <div class="outer">
+    <ul class="list-inline">
+      <li>
+        &copy;
+        2020
+        Karthur
+      </li>
+      <li>
+        
+      </li>
+    </ul>
+    <ul class="list-inline">
+      <li>
+        
+        
+        <span>
+  <i>PV:<span id="busuanzi_value_page_pv"></span></i>
+  <i>UV:<span id="busuanzi_value_site_uv"></span></i>
+</span>
+        
+      </li>
+      
+      <li>
+        <!-- cnzz统计 -->
+        
+        <script type="text/javascript" src='https://s9.cnzz.com/z_stat.php?id=1278069914&amp;web_id=1278069914'></script>
+        
+      </li>
+    </ul>
+  </div>
+</footer>
+      <div class="to_top">
+        <div class="totop" id="totop">
+  <i class="ri-arrow-up-line"></i>
+</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+  <div class="logo">
+    <a href="/"><img src="/images/ayer-side.svg" alt="愿那颗星星一直指引你"></a>
+  </div>
+  
+  <ul class="nav nav-main">
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/">主页</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/archives">归档</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/categories">分类</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/tags">标签</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/about">关于我</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="https://github.com/KArthurL" target="_blank" rel="noopener">github</a>
+    </li>
+    
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      
+      <a class="nav-item-link nav-item-search"  title="Search">
+        <i class="ri-search-line"></i>
+      </a>
+      
+      
+      <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+        <i class="ri-rss-line"></i>
+      </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+    </aside>
+    <div id="mask"></div>
+
+<!-- #reward -->
+<div id="reward">
+  <span class="close"><i class="ri-close-line"></i></span>
+  <p class="reward-p"><i class="ri-cup-line"></i>请我喝杯咖啡吧~</p>
+  <div class="reward-box">
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/alipay.jpg">
+      <span class="reward-type">支付宝</span>
+    </div>
+    
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/wechat.jpg">
+      <span class="reward-type">微信</span>
+    </div>
+    
+  </div>
+</div>
+    
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+<script src="/js/share.js"></script>
+
+
+
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script>
+  try {
+    var typed = new Typed("#subtitle", {
+    strings: ['一闪一闪亮晶晶','满天都是小星星','海上生明月，天涯共此时'],
+    startDelay: 0,
+    typeSpeed: 200,
+    loop: true,
+    backSpeed: 100,
+    showCursor: true
+    });
+  } catch (err) {
+  }
+  
+</script>
+
+
+
+
+<script src="/js/tocbot.min.js"></script>
+
+<script>
+  // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+  tocbot.init({
+    tocSelector: '.tocbot',
+    contentSelector: '.article-entry',
+    headingSelector: 'h1, h2, h3, h4, h5, h6',
+    hasInnerContainers: true,
+    scrollSmooth: true,
+    scrollContainer:'main',
+    positionFixedSelector: '.tocbot',
+    positionFixedClass: 'is-position-fixed',
+    fixedSidebarOffset: 'auto',
+    onClick: (e) => {
+      $('.toc-link').removeClass('is-active-link');
+      $(`a[href=${e.target.hash}]`).addClass('is-active-link');
+      $(e.target.hash).scrollIntoView();
+      return false;
+    }
+  });
+</script>
+
+
+<script>
+  var ayerConfig = {
+    mathjax: false
+  }
+</script>
+
+
+<script src="/js/ayer.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.css">
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" style="display:none" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css">
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"></script>
+
+<script>
+    function viewer_init() {
+        let pswpElement = document.querySelectorAll('.pswp')[0];
+        let $imgArr = document.querySelectorAll(('.article-entry img:not(.reward-img)'))
+
+        $imgArr.forEach(($em, i) => {
+            $em.onclick = () => {
+                // slider展开状态
+                // todo: 这样不好，后面改成状态
+                if (document.querySelector('.left-col.show')) return
+                let items = []
+                $imgArr.forEach(($em2, i2) => {
+                    let img = $em2.getAttribute('data-idx', i2)
+                    let src = $em2.getAttribute('data-target') || $em2.getAttribute('src')
+                    let title = $em2.getAttribute('alt')
+                    // 获得原图尺寸
+                    const image = new Image()
+                    image.src = src
+                    items.push({
+                        src: src,
+                        w: image.width || $em2.width,
+                        h: image.height || $em2.height,
+                        title: title
+                    })
+                })
+                var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, {
+                    index: parseInt(i)
+                });
+                gallery.init()
+            }
+        })
+    }
+    viewer_init()
+</script>
+
+
+
+
+<script type="text/javascript" src="https://js.users.51.la/20544303.js"></script>
+
+    
+  </div>
+</body>
+
+</html>

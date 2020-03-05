@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-02T15:18:38.332Z</updated>
+  <updated>2020-03-05T14:25:29.046Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -17,11 +17,239 @@
   <generator uri="https://hexo.io/">Hexo</generator>
   
   <entry>
+    <title>Java8中的Stream</title>
+    <link href="http://yoursite.com/2020/02/26/Java8%E4%B8%AD%E7%9A%84Stream/"/>
+    <id>http://yoursite.com/2020/02/26/Java8%E4%B8%AD%E7%9A%84Stream/</id>
+    <published>2020-02-26T08:18:29.000Z</published>
+    <updated>2020-03-05T14:25:29.046Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Stream是Java8的一大新特性，其实在以前我也只是听过其大名，也没有好好学一下，因为觉得老语法用的还蛮顺手的。直到最近，参加了阿里巴巴的面试，面试官问我会用Stream吗……那我只能老老实实回答，不大会。。。场面一度有点尴尬（笑），虽然面试结果还行，但是面试官也是建议我有空可以学一下。&lt;/p&gt;
+&lt;p&gt;当我学了之后，我不得不好好反思一下，为啥没有push自己去学新的东西呀？！因为这玩意有瘾，用上了就根本停不下来。本文就来简单介绍一下Java中的Stream是怎么回事。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
+    
+      <category term="方法" scheme="http://yoursite.com/tags/%E6%96%B9%E6%B3%95/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>这段时间的一些感触</title>
+    <link href="http://yoursite.com/2020/02/25/%E8%BF%99%E6%AE%B5%E6%97%B6%E9%97%B4%E7%9A%84%E4%B8%80%E4%BA%9B%E6%84%9F%E8%A7%A6/"/>
+    <id>http://yoursite.com/2020/02/25/%E8%BF%99%E6%AE%B5%E6%97%B6%E9%97%B4%E7%9A%84%E4%B8%80%E4%BA%9B%E6%84%9F%E8%A7%A6/</id>
+    <published>2020-02-25T15:22:33.000Z</published>
+    <updated>2020-03-05T15:34:49.203Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;&amp;emsp;&amp;emsp;写了一些技术博客，有点想写写自己了。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="杂谈" scheme="http://yoursite.com/categories/%E6%9D%82%E8%B0%88/"/>
+    
+    
+      <category term="杂谈" scheme="http://yoursite.com/tags/%E6%9D%82%E8%B0%88/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>Netty框架下的心跳重连机制实现</title>
+    <link href="http://yoursite.com/2020/02/23/%E2%80%9CNetty%E6%A1%86%E6%9E%B6%E4%B8%8B%E7%9A%84%E5%BF%83%E8%B7%B3%E9%87%8D%E8%BF%9E%E6%9C%BA%E5%88%B6%E5%AE%9E%E7%8E%B0%E2%80%9D/"/>
+    <id>http://yoursite.com/2020/02/23/%E2%80%9CNetty%E6%A1%86%E6%9E%B6%E4%B8%8B%E7%9A%84%E5%BF%83%E8%B7%B3%E9%87%8D%E8%BF%9E%E6%9C%BA%E5%88%B6%E5%AE%9E%E7%8E%B0%E2%80%9D/</id>
+    <published>2020-02-23T14:41:46.000Z</published>
+    <updated>2020-03-05T08:11:59.381Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在设计到网络通信的项目中，时常要考虑到网络的不稳定性。TCP连接正常情况下断开是需要四次挥手的，当网络突然崩了，包都发不出去，自然就谈不上四次挥手了。此时服务端认为客户端还连着，一直占用的资源就得不到释放。（虽然TCP连接有自带的keep-alive机制，但那时间可是两个小时啊！）&lt;/p&gt;
+&lt;p&gt;所谓心跳机制，是定时发送一个自定义的结构体(心跳包)，让对方知道自己还活着，以确保连接的有效性的机制。现在很多的框架以及中间件都用到了心跳检测，比如Spring Cloud中服务注册到Eureka之后会维护一个心跳连接，告诉Eureka自己还活着；Rocket MQ中的Broker和NameSever也会维护一个心跳连接。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="框架" scheme="http://yoursite.com/categories/%E6%A1%86%E6%9E%B6/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="Netty" scheme="http://yoursite.com/tags/Netty/"/>
+    
+      <category term="网络编程" scheme="http://yoursite.com/tags/%E7%BD%91%E7%BB%9C%E7%BC%96%E7%A8%8B/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>NIO中的堆外内存回收——虚引用</title>
+    <link href="http://yoursite.com/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/"/>
+    <id>http://yoursite.com/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/</id>
+    <published>2020-02-20T15:07:28.000Z</published>
+    <updated>2020-03-04T14:44:17.472Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在学习《深入理解Java虚拟机》一书中，我们知道NIO是可以直接使用系统内存（DirectByteBuffer）。而我们知道JVM垃圾回收是无法回收系统的直接内存的，那这块内存用过之后是如何释放的？&lt;/p&gt;
+&lt;p&gt;当然肯定不需要我们像C++那样手动释放，这里就要引出Java中最弱的一个引用了——虚引用……&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="JVM" scheme="http://yoursite.com/categories/JVM/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="IO" scheme="http://yoursite.com/tags/IO/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>NIO的三大组件</title>
+    <link href="http://yoursite.com/2020/02/19/NIO%E7%9A%84%E4%B8%89%E5%A4%A7%E7%BB%84%E4%BB%B6/"/>
+    <id>http://yoursite.com/2020/02/19/NIO%E7%9A%84%E4%B8%89%E5%A4%A7%E7%BB%84%E4%BB%B6/</id>
+    <published>2020-02-19T14:39:46.000Z</published>
+    <updated>2020-03-04T11:41:51.741Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;项目中用到Netty比较多，本来想直接写Netty方面的一些文章。但是考虑到Netty本身是对Java NIO的封装，抽象出一个简单易懂的编程模型，所以我觉得还是有必要对一些底层的东西先做一些介绍，不然到时候怕是看的一脸懵逼。&lt;/p&gt;
+&lt;p&gt;本文主要是介绍NIO的一些概念，包括其三大组件：Buffer、Channel和Selector，以原理为主。有一说一，NIO使用起来还是蛮复杂的，可能绝大多数情况下我们也接触不到，所以有些地方讲的不到位，请大家见谅。&lt;/p&gt;
+&lt;p&gt;阅读本文之前，最好能了解下常见的IO模型，比如：同步阻塞IO，同步非阻塞IO，IO多路复用等等。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="IO" scheme="http://yoursite.com/categories/IO/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="IO" scheme="http://yoursite.com/tags/IO/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>集合中的fail-fast机制</title>
+    <link href="http://yoursite.com/2020/02/17/%E9%9B%86%E5%90%88%E4%B8%AD%E7%9A%84fail-fast%E6%9C%BA%E5%88%B6/"/>
+    <id>http://yoursite.com/2020/02/17/%E9%9B%86%E5%90%88%E4%B8%AD%E7%9A%84fail-fast%E6%9C%BA%E5%88%B6/</id>
+    <published>2020-02-17T14:37:55.000Z</published>
+    <updated>2020-03-04T06:27:37.726Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;阿里巴巴Java开发手册中有这样一条规定：不要在 foreach 循环里进行元素的 remove/add 操作。remove 元素请使用&lt;br&gt;Iterator 方式，如果并发操作，需要对 Iterator 对象加锁。&lt;/p&gt;
+&lt;p&gt;本文将从源码的角度去解释这条规定。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="规范" scheme="http://yoursite.com/categories/%E8%A7%84%E8%8C%83/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
+    
+      <category term="规范" scheme="http://yoursite.com/tags/%E8%A7%84%E8%8C%83/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>ArrayList源码解析</title>
+    <link href="http://yoursite.com/2020/02/16/ArrayList%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/"/>
+    <id>http://yoursite.com/2020/02/16/ArrayList%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/</id>
+    <published>2020-02-16T14:36:16.000Z</published>
+    <updated>2020-03-03T12:43:57.478Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;ArrayList也是一种老生常谈的集合。它的底层数据结构是数组，支持动态扩容。优点是查询速度快，时间效率高；缺点是空间效率不高。我自己在项目中ArrayList用的也挺多的，但是之前也没有看过底层实现，很多理解也只是在停留在表面。想要深入理解，还是得分析源码，从中学习，本文的目的也在于此。&lt;/p&gt;
+&lt;p&gt;PS：JDK版本12&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>HashMap源码解析</title>
+    <link href="http://yoursite.com/2020/02/15/HashMap%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/"/>
+    <id>http://yoursite.com/2020/02/15/HashMap%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/</id>
+    <published>2020-02-15T14:35:56.000Z</published>
+    <updated>2020-03-03T12:44:05.211Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;哈希表是一种非常重要的数据结构，应用场景及其丰富。HashMap是Java中的哈希表实现，采用分离链表法解决hash冲突，其底层数据结构为数组+链表/红黑树（JDK1.8后）。其实关于网上关于HashMap的文章确实不少，不过大多感觉有点缺斤少两，有些疑惑的地方也没有解答，就我自己而言可能看了很多篇还是很模糊。所以想了想还是自己写一篇，争取能写的全面点，再加上一些自己的理解，希望能降低下大家的学习成本。&lt;/p&gt;
+&lt;p&gt;PS：JDK版本12&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>浮点数与BigDecimal</title>
+    <link href="http://yoursite.com/2020/02/13/%E6%B5%AE%E7%82%B9%E6%95%B0%E4%B8%8EBigDecimal/"/>
+    <id>http://yoursite.com/2020/02/13/%E6%B5%AE%E7%82%B9%E6%95%B0%E4%B8%8EBigDecimal/</id>
+    <published>2020-02-13T15:08:34.000Z</published>
+    <updated>2020-03-03T10:35:16.699Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在之前写软件的时候出现过这样一种情况，软件界面在显示位移的时候，经常会出现类似于1.9999999964这样子的小数。当时可真是百思不得其解呀，到底问题出在哪？&lt;/p&gt;
+&lt;p&gt;后来才知道，我在计算位移的时候使用的浮点数，而浮点数是存在精度损失的。后来我把浮点数换成了BigDecimal，问题就解决了。这篇文章也算是记录下自己所踩的坑。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="规范" scheme="http://yoursite.com/categories/%E8%A7%84%E8%8C%83/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="规范" scheme="http://yoursite.com/tags/%E8%A7%84%E8%8C%83/"/>
+    
+  </entry>
+  
+  <entry>
     <title>为什么阿里巴巴手册中禁用默认实现的线程池</title>
     <link href="http://yoursite.com/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/"/>
     <id>http://yoursite.com/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/</id>
     <published>2020-02-12T14:38:30.000Z</published>
-    <updated>2020-03-02T15:18:38.332Z</updated>
+    <updated>2020-03-03T10:35:01.476Z</updated>
     
     <summary type="html">
     
@@ -47,7 +275,7 @@
     <link href="http://yoursite.com/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/"/>
     <id>http://yoursite.com/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/</id>
     <published>2020-02-11T14:34:40.000Z</published>
-    <updated>2020-03-02T15:18:27.779Z</updated>
+    <updated>2020-03-03T10:33:27.851Z</updated>
     
     <summary type="html">
     
@@ -73,7 +301,7 @@
     <link href="http://yoursite.com/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/"/>
     <id>http://yoursite.com/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/</id>
     <published>2020-02-09T14:34:18.000Z</published>
-    <updated>2020-03-02T15:17:01.661Z</updated>
+    <updated>2020-03-03T10:34:41.295Z</updated>
     
     <summary type="html">
     
@@ -98,7 +326,7 @@
     <link href="http://yoursite.com/2020/02/08/volatile%E5%92%8CCAS/"/>
     <id>http://yoursite.com/2020/02/08/volatile%E5%92%8CCAS/</id>
     <published>2020-02-08T13:51:50.000Z</published>
-    <updated>2020-03-02T15:17:07.980Z</updated>
+    <updated>2020-03-03T10:34:25.640Z</updated>
     
     <summary type="html">
     
@@ -122,7 +350,7 @@
     <link href="http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/"/>
     <id>http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/</id>
     <published>2020-02-05T10:13:54.000Z</published>
-    <updated>2020-03-02T15:17:12.982Z</updated>
+    <updated>2020-03-03T10:34:07.484Z</updated>
     
     <summary type="html">
     
@@ -146,7 +374,7 @@
     <link href="http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"/>
     <id>http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</id>
     <published>2020-02-03T14:11:26.000Z</published>
-    <updated>2020-03-02T15:17:19.137Z</updated>
+    <updated>2020-03-03T10:33:52.712Z</updated>
     
     <summary type="html">
     

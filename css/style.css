@@ -5374,7 +5374,7 @@
 }
 /* normalize.css v8.0.0 | MIT License | github.com/necolas/normalize.css */
 html {
-  line-height: 1.15 /* 1 */;
+  line-height: 1.5 /* 1 */;
   -webkit-text-size-adjust: 100% /* 2 */;
 }
 body {
@@ -5417,7 +5417,7 @@ small {
 sub,
 sup {
   font-size: 75%;
-  line-height: 0;
+  line-height: 1.5;
   position: relative;
   vertical-align: baseline;
 }
@@ -5537,7 +5537,7 @@ body {
   background-color: #fff;
   font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "微软雅黑", Arial, sans-serif;
   font-size: 1.4rem;
-  line-height: 1.7;
+  line-height: 2rem;
   color: #403e3e;
   padding: 0;
   margin: 0;
