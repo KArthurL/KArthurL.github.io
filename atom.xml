@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-05T14:25:29.046Z</updated>
+  <updated>2020-03-06T13:25:18.023Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,57 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Netty的线程模型</title>
+    <link href="http://yoursite.com/2020/03/02/Netty%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/"/>
+    <id>http://yoursite.com/2020/03/02/Netty%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/</id>
+    <published>2020-03-02T08:48:34.000Z</published>
+    <updated>2020-03-06T13:25:18.023Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;在开始Netty的源码解析之前，我想了想还是铺垫一下比较好，所以先整一篇Netty的线程模型过渡一下。&lt;/p&gt;
+&lt;p&gt;Netty高性能的原因有两方面，其一是它的IO模型，Netty封装了NIO，实现了IO多路复用模型；其二是Netty的线程模型，良好的线程模型设计，能够减少线程上下文切换，减少甚至避免锁的竞争（无锁化设计）带来的开销。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="框架" scheme="http://yoursite.com/categories/%E6%A1%86%E6%9E%B6/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="Netty" scheme="http://yoursite.com/tags/Netty/"/>
+    
+      <category term="网络编程" scheme="http://yoursite.com/tags/%E7%BD%91%E7%BB%9C%E7%BC%96%E7%A8%8B/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>Welcome</title>
+    <link href="http://yoursite.com/2020/02/28/hello-world/"/>
+    <id>http://yoursite.com/2020/02/28/hello-world/</id>
+    <published>2020-02-28T12:50:46.705Z</published>
+    <updated>2020-03-06T09:16:57.587Z</updated>
+    
+    <summary type="html">
+    
+      
+      
+        
+        
+          &lt;p&gt;欢迎来到我的博客！我是Karthur，一名路过的Java工程师……&lt;/p&gt;
+&lt;p&gt;这里是我平时写的一些文章，希望能给读者们带来一些帮助，分享一些所学所思～&lt;/p&gt;
+&lt;h1 id=&quot;Java并发&quot;&gt;&lt;a href=&quot;#Java并发&quot; class=&quot;headerlink&quot;
+        
+      
+    
+    </summary>
+    
+    
+    
+  </entry>
   
   <entry>
     <title>Java8中的Stream</title>

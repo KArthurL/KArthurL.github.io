@@ -1,6 +1,96 @@
 <?xml version="1.0" encoding="utf-8"?>
 <search>
   <entry>
+    <title>Netty的线程模型</title>
+    <url>/2020/03/02/Netty%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/</url>
+    <content><![CDATA[<p>在开始Netty的源码解析之前，我想了想还是铺垫一下比较好，所以先整一篇Netty的线程模型过渡一下。</p>
+<p>Netty高性能的原因有两方面，其一是它的IO模型，Netty封装了NIO，实现了IO多路复用模型；其二是Netty的线程模型，良好的线程模型设计，能够减少线程上下文切换，减少甚至避免锁的竞争（无锁化设计）带来的开销。</p>
+<a id="more"></a>
+<h1 id="Reactor模式"><a href="#Reactor模式" class="headerlink" title="Reactor模式"></a>Reactor模式</h1><p>说起Netty的线程模型，就不得不提到Reactor模式。</p>
+<p>Reactor模式是一种为处理并发服务请求，并将请求提交到一个或者多个服务处理程序的事件设计模式。当客户端请求抵达后，服务处理程序使用多路分配策略，由一个非阻塞的线程来接收所有的请求，然后派发这些请求至相关的工作线程进行处理。我们可以根据下面这张图理解一下：<br><img src="https://i.loli.net/2020/03/06/pwcHEbYOZJzfKgG.jpg" alt="reactor.jpg"></p>
+<p>让我们看一下经典的Reactor模型有哪些。</p>
+<h2 id="Reactor单线程模型"><a href="#Reactor单线程模型" class="headerlink" title="Reactor单线程模型"></a>Reactor单线程模型</h2><p>首先是Reactor单线程模型，顾名思义，是指所有IO操作都在一个线程上完成，包括：</p>
+<ol>
+<li>建立TCP连接；</li>
+<li>读取通信对端发送过来的消息；</li>
+<li>想通信对端发送消息；</li>
+</ol>
+<p>可以参考这张图：</p>
+<p><img src="https://i.loli.net/2020/03/06/Or9I6RyfHjGbMez.png" alt="oreactor.png"></p>
+<p>由于一般Reactor模式使用的是非阻塞IO，所有的IO操作都不会导致阻塞，所以理论上一个线程可以独立处理所有IO相关的操作。例如，通过Acceptor接受TCP连接请求，建立连接后通过Dispatch将消息派发到指定的Handler上进行消息的处理等等。</p>
+<p>但是，对于高负载、大并发的应用场景下，就不宜使用这种模式了，主要原因如下：</p>
+<ol>
+<li>一个线程同时处理成千上万的链路，除了处理IO事件外，还要兼顾对消息的处理，性能上无法支撑。</li>
+<li>当单个线程处理消息的速度变慢后，会导致大量的客户端连接超时，重发消息，这更加重了IO线程的负载，最终导致大量消息积压和处理超时。</li>
+<li>单个线程往往未必可靠，如果意外进入死循环或者挂掉了，那么整个通信系统将变得不可用。</li>
+</ol>
+<p>为了解决这个问题，后来演进出了多线程模型。</p>
+<h2 id="Reactor多线程模型"><a href="#Reactor多线程模型" class="headerlink" title="Reactor多线程模型"></a>Reactor多线程模型</h2><p>一般而言，IO操作中读写事件往往比处理连接事件更加耗时耗资源，因此Reactor多线程模型使用了一组线程（线程池）来处理IO读写事件，用了一个Acceptor线程来专门处理连接事件：</p>
+<p><img src="https://i.loli.net/2020/03/06/F3QuWh2AnRweVZL.png" alt="mreactor.png"></p>
+<ul>
+<li>Acceptor线程：用于监听端口，接受客户端的TCP连接请求。</li>
+<li>线程池：用于处理IO读写操作。线程池中的线程负责消息的读取或者发送。一个线程可以同时处理N条链路，但是一个链路只属于一个NIO线程，防止发生并发操作问题。</li>
+</ul>
+<p>在绝大多数场景下，Reactor多线程模型足够满足性能需求，但在个别特殊的场景中，单个Acceptor可能也会存在性能不足的问题。为了解决这个问题，产生了第三种Reactor模型——Reactor主从多线程模型。</p>
+<h2 id="Reactor主从多线程模型"><a href="#Reactor主从多线程模型" class="headerlink" title="Reactor主从多线程模型"></a>Reactor主从多线程模型</h2><p>Reactor主从多线程模型的特点在于，它不再使用单个线程来处理连接请求，而是一个独立的线程池。Acceptor线程池接受到连接请求后，将新创建的SocketChannel注册到IO线程池的某个线程上负责后续的读写事件，如下图所示：</p>
+<p><img src="https://i.loli.net/2020/03/06/4lngNZxKjaPGCrt.png" alt="msreactor.png"></p>
+<p>使用Reactor主从多线程模型，可以有效解决一个Acceptor线程无法有效处理所有客户端连接的性能不足问题。</p>
+<h1 id="Netty中的线程模型"><a href="#Netty中的线程模型" class="headerlink" title="Netty中的线程模型"></a>Netty中的线程模型</h1><p>Netty的线程模型，根据配置的不同，可以使上述的任意一种，官方更推荐Reactor主从多线程模型。</p>
+<p>如果有过Netty编程经验的话，在初始化服务端的时候，会新建两个EventLoopGroup。这本质上就是两个线程池，一个负责监听连接请求，一个负责处理IO事件，如下图所示：</p>
+<p><img src="https://i.loli.net/2020/03/06/lmGEpcYgrU9HdvF.jpg" alt="Nettythread.png"></p>
+<p>Boss Group便是监听端口的线程组，当其接收到连接请求后，初始化Channel并将其注册到Worker Group中的一条EventLoop上。随后这条EventLoop便负责这个连接后续的所有读写事件。</p>
+<p>当然，Netty还采用了串行化的设计理念，从消息的读取-&gt;解码-&gt;处理-&gt;编码-&gt;发送，始终由IO线程NioEventLoop负责，而且一个Channel之归属于一条EventLoop。整个流程不会进行线程上下文切换，数据无并发修改风险。此外，Netty的IO线程除了处理IO事件外，还会处理一些系统任务，这个在讲解源码的时候我们会详细说到。</p>
+<h1 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h1><p>本文主要介绍了下Reactor模式及其三种模型和Netty的线程模型，让大家心中对Netty的运行机制有个大概的了解。后续将会是源码解析的文章了，关于这方面我可能要好好规划下怎么写，敬请期待～</p>
+]]></content>
+      <categories>
+        <category>框架</category>
+      </categories>
+      <tags>
+        <tag>原创</tag>
+        <tag>Netty</tag>
+        <tag>网络编程</tag>
+      </tags>
+  </entry>
+  <entry>
+    <title>Welcome</title>
+    <url>/2020/02/28/hello-world/</url>
+    <content><![CDATA[<p>欢迎来到我的博客！我是Karthur，一名路过的Java工程师……</p>
+<p>这里是我平时写的一些文章，希望能给读者们带来一些帮助，分享一些所学所思～</p>
+<h1 id="Java并发"><a href="#Java并发" class="headerlink" title="Java并发"></a>Java并发</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/" target="_blank" rel="noopener">Java内存模型</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/" target="_blank" rel="noopener">内存可见性、原子性和重排序</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/" target="_blank" rel="noopener">synchronized的原理和使用</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/08/volatile%E5%92%8CCAS/" target="_blank" rel="noopener">volatile和CAS</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/09/Java%E4%B8%AD%E7%9A%84%E5%8E%9F%E5%AD%90%E7%B1%BB/" target="_blank" rel="noopener">Java中的原子基本类型类</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/11/ThreadLocal%E8%A7%A3%E6%9E%90/" target="_blank" rel="noopener">ThreadLocal解析</a></li>
+</ol>
+<h1 id="集合"><a href="#集合" class="headerlink" title="集合"></a>集合</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/15/HashMap%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" target="_blank" rel="noopener">HashMap源码解析</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/16/ArrayList%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90/" target="_blank" rel="noopener">ArrayList源码解析</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/26/Java8%E4%B8%AD%E7%9A%84Stream/" target="_blank" rel="noopener">Java8中的Stream</a></li>
+</ol>
+<h1 id="Java-IO"><a href="#Java-IO" class="headerlink" title="Java IO"></a>Java IO</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/19/NIO%E7%9A%84%E4%B8%89%E5%A4%A7%E7%BB%84%E4%BB%B6/" target="_blank" rel="noopener">NIO的三大组件</a></li>
+</ol>
+<h1 id="JVM"><a href="#JVM" class="headerlink" title="JVM"></a>JVM</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/" target="_blank" rel="noopener">NIO中的堆外内存回收——虚引用</a></li>
+</ol>
+<h1 id="框架"><a href="#框架" class="headerlink" title="框架"></a>框架</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/23/%E2%80%9CNetty%E6%A1%86%E6%9E%B6%E4%B8%8B%E7%9A%84%E5%BF%83%E8%B7%B3%E9%87%8D%E8%BF%9E%E6%9C%BA%E5%88%B6%E5%AE%9E%E7%8E%B0%E2%80%9D/" target="_blank" rel="noopener">Netty框架下的心跳重连机制实现</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/03/01/Netty%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%A8%A1%E5%9E%8B/" target="_blank" rel="noopener">Netty的线程模型</a></li>
+</ol>
+<h1 id="规范"><a href="#规范" class="headerlink" title="规范"></a>规范</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/" target="_blank" rel="noopener">为什么阿里巴巴手册中禁用默认实现的线程池</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/13/%E6%B5%AE%E7%82%B9%E6%95%B0%E4%B8%8EBigDecimal/" target="_blank" rel="noopener">浮点数与BigDecimal</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/02/17/%E9%9B%86%E5%90%88%E4%B8%AD%E7%9A%84fail-fast%E6%9C%BA%E5%88%B6/" target="_blank" rel="noopener">集合中的fail-fast机制</a></li>
+</ol>
+<h1 id="杂谈"><a href="#杂谈" class="headerlink" title="杂谈"></a>杂谈</h1><ol>
+<li><a href="https://www.mybulinbulin.cn/2020/02/25/%E8%BF%99%E6%AE%B5%E6%97%B6%E9%97%B4%E7%9A%84%E4%B8%80%E4%BA%9B%E6%84%9F%E8%A7%A6/" target="_blank" rel="noopener">这段时间的一些感触</a></li>
+</ol>
+<p>大家除了根据分类来寻找文章，也可根据自己的喜好，通过标签来查阅文章，祝大家能有所收获～</p>
+]]></content>
+  </entry>
+  <entry>
     <title>Java8中的Stream</title>
     <url>/2020/02/26/Java8%E4%B8%AD%E7%9A%84Stream/</url>
     <content><![CDATA[<p>Stream是Java8的一大新特性，其实在以前我也只是听过其大名，也没有好好学一下，因为觉得老语法用的还蛮顺手的。直到最近，参加了阿里巴巴的面试，面试官问我会用Stream吗……那我只能老老实实回答，不大会。。。场面一度有点尴尬（笑），虽然面试结果还行，但是面试官也是建议我有空可以学一下。</p>
