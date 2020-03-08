@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-06T13:25:18.023Z</updated>
+  <updated>2020-03-08T11:13:11.587Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,32 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Netty源码解析之服务端创建</title>
+    <link href="http://yoursite.com/2020/03/06/Netty%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%E4%B9%8B%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA/"/>
+    <id>http://yoursite.com/2020/03/06/Netty%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%E4%B9%8B%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA/</id>
+    <published>2020-03-06T13:51:22.000Z</published>
+    <updated>2020-03-08T11:13:11.587Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;一直在想以什么思路去写框架的源码解析比较好，按照我个人的学习经验的话，或许从大到小，从整体到细节，可能会让人比较容易接受一些。所以这第一篇文章，我打算从Netty的服务端初始化开始，剖析以下服务端初始化的过程中做了什么。&lt;/p&gt;
+&lt;p&gt;在阅读本文之前，希望大家能掌握NIO的相关知识，最好还有一些Netty的使用经验，这样读起来会容易些。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="框架" scheme="http://yoursite.com/categories/%E6%A1%86%E6%9E%B6/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="Netty" scheme="http://yoursite.com/tags/Netty/"/>
+    
+  </entry>
   
   <entry>
     <title>Netty的线程模型</title>
@@ -47,7 +73,7 @@
     <link href="http://yoursite.com/2020/02/28/hello-world/"/>
     <id>http://yoursite.com/2020/02/28/hello-world/</id>
     <published>2020-02-28T12:50:46.705Z</published>
-    <updated>2020-03-06T13:33:29.425Z</updated>
+    <updated>2020-03-08T11:14:20.746Z</updated>
     
     <summary type="html">
     
@@ -85,9 +111,9 @@
       <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
     
     
-      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
-    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
     
       <category term="方法" scheme="http://yoursite.com/tags/%E6%96%B9%E6%B3%95/"/>
     
@@ -209,9 +235,9 @@
       <category term="规范" scheme="http://yoursite.com/categories/%E8%A7%84%E8%8C%83/"/>
     
     
-      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
-    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
     
       <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
     
@@ -237,9 +263,9 @@
       <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
     
     
-      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
-    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
     
       <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
     
@@ -263,9 +289,9 @@
       <category term="集合" scheme="http://yoursite.com/categories/%E9%9B%86%E5%90%88/"/>
     
     
-      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
-    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="集合" scheme="http://yoursite.com/tags/%E9%9B%86%E5%90%88/"/>
     
       <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
     
@@ -313,9 +339,9 @@
       <category term="规范" scheme="http://yoursite.com/categories/%E8%A7%84%E8%8C%83/"/>
     
     
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
       <category term="规范" scheme="http://yoursite.com/tags/%E8%A7%84%E8%8C%83/"/>
     
@@ -339,11 +365,11 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
       <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
-    
-      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
     
   </entry>
   
@@ -364,11 +390,11 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
+      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
       <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
       <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
-    
-      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
     
   </entry>
   
@@ -390,9 +416,9 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
   </entry>
   
@@ -414,9 +440,9 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
   </entry>
   
@@ -437,9 +463,9 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
   </entry>
   
@@ -461,9 +487,9 @@
       <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
     
     
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
       <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
     
   </entry>
   
