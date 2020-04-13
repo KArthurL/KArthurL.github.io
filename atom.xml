@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-03-09T13:46:42.084Z</updated>
+  <updated>2020-04-10T13:51:59.391Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,32 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>Netty中的FastThreadLocal</title>
+    <link href="http://yoursite.com/2020/04/05/Netty%E4%B8%AD%E7%9A%84FastThreadLocal/"/>
+    <id>http://yoursite.com/2020/04/05/Netty%E4%B8%AD%E7%9A%84FastThreadLocal/</id>
+    <published>2020-04-05T08:33:03.000Z</published>
+    <updated>2020-04-10T13:51:59.391Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;Netty在性能优化方面可以说“无所不用其极”，除了线程模型和内存管理外，还基于JDK实现了一系列改进版的组件，例如FastThreadLocal就是基于ThreadLocal实现的。Netty实现的FastThreadLocal相较于Java原生优化了ThreadLocal的访问速度、内存泄漏等方面，本文将从源码入手，介绍FastThreadLocal的使用原理。&lt;/p&gt;
+&lt;p&gt;友情提示，阅读本文前需要对ThreadLocal有一定的了解，可以看一下之前的文章。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="框架" scheme="http://yoursite.com/categories/%E6%A1%86%E6%9E%B6/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="源码" scheme="http://yoursite.com/tags/%E6%BA%90%E7%A0%81/"/>
+    
+      <category term="Netty" scheme="http://yoursite.com/tags/Netty/"/>
+    
+  </entry>
   
   <entry>
     <title>Netty源码解析之线程池</title>
@@ -98,7 +124,7 @@
     <link href="http://yoursite.com/2020/02/28/hello-world/"/>
     <id>http://yoursite.com/2020/02/28/hello-world/</id>
     <published>2020-02-28T12:50:46.705Z</published>
-    <updated>2020-03-09T13:47:53.332Z</updated>
+    <updated>2020-04-10T13:52:25.306Z</updated>
     
     <summary type="html">
     
@@ -481,30 +507,6 @@
     <summary type="html">
     
       &lt;p&gt;在上一篇文章中，笔者简单介绍了下&lt;a href=&quot;https://karthurl.github.io/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Java内存模型&lt;/a&gt;。本文承接上文，主要以代码+图片的形式呈现给大家，其主要目的是让大家对于并发程序中的内存可见性、原子性以及重排序有一定的了解。这三个问题也是并发程序为什么难写的原因。&lt;/p&gt;
-    
-    </summary>
-    
-    
-      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
-    
-    
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
-      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>Java内存模型</title>
-    <link href="http://yoursite.com/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/"/>
-    <id>http://yoursite.com/2020/02/02/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/</id>
-    <published>2020-02-02T10:29:40.000Z</published>
-    <updated>2020-03-02T15:17:25.290Z</updated>
-    
-    <summary type="html">
-    
-      &lt;p&gt;本文从Java内存模型开始，通过对内存模型的理解让大家对于并发中的内存可见性、原子性和重排序有一些自己的想法，为后续的Java并发编程打下基础。&lt;/p&gt;
-&lt;p&gt;阅读本文前，需要有一定的Java基础，最好还有一定的并发编程基础。&lt;/p&gt;
     
     </summary>
     

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>
+    Netty中的FastThreadLocal |  愿那颗星星一直指引你
+  </title>
+  <meta name="generator" content="hexo-theme-yilia-plus">
+  
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+<script src="/js/pace.min.js"></script>
+
+
+  
+
+  
+
+<link rel="alternate" href="/atom.xml" title="愿那颗星星一直指引你" type="application/atom+xml">
+</head>
+
+</html>
+
+<body>
+  <div id="app">
+    <main class="content">
+      <section class="outer">
+  <article id="post-Netty中的FastThreadLocal" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h1 class="article-title sea-center" style="border-left:0" itemprop="name">
+  Netty中的FastThreadLocal
+</h1>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/04/05/Netty%E4%B8%AD%E7%9A%84FastThreadLocal/" class="article-date">
+  <time datetime="2020-04-05T08:33:03.000Z" itemprop="datePublished">2020-04-05</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E6%A1%86%E6%9E%B6/">框架</a>
+  </div>
+
+      
+      
+<div class="word_count">
+    <span class="post-time">
+        <span class="post-meta-item-icon">
+            <i class="ri-quill-pen-line"></i>
+            <span class="post-meta-item-text"> 字数统计:</span>
+            <span class="post-count">2.7k字</span>
+        </span>
+    </span>
+
+    <span class="post-time">
+        &nbsp; | &nbsp;
+        <span class="post-meta-item-icon">
+            <i class="ri-book-open-line"></i>
+            <span class="post-meta-item-text"> 阅读时长≈</span>
+            <span class="post-count">11分钟</span>
+        </span>
+    </span>
+</div>
+
+      
+    </div>
+    
+
+    
+    
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>Netty在性能优化方面可以说“无所不用其极”，除了线程模型和内存管理外，还基于JDK实现了一系列改进版的组件，例如FastThreadLocal就是基于ThreadLocal实现的。Netty实现的FastThreadLocal相较于Java原生优化了ThreadLocal的访问速度、内存泄漏等方面，本文将从源码入手，介绍FastThreadLocal的使用原理。</p>
+<p>友情提示，阅读本文前需要对ThreadLocal有一定的了解，可以看一下之前的文章。</p>
+<a id="more"></a>
+<h1 id="概述"><a href="#概述" class="headerlink" title="概述"></a>概述</h1><p>在正式开始之前，先回顾一下ThreadLocal，Java的每个Thread实例都有ThreadLocal.ThreadLocalMap类型的字段threadLocals，我们使用的ThreadLocal对象实例则作为key，实际的值为value。ThreadLocalMap使用哈希表作为存储k-v的数据结构。不过与HashMap不同，HashMap采用分离链表法来处理哈希冲突，而ThreadLocalMap使用线性探测再散列解决hash冲突，这也导致了其在set/get的时候有较高的时间复杂度。ThreadLocal还有一个问题就是存在内存泄漏的隐患，其原因在于Entry对ThreadLocal是弱引用，但是对Value是强引用，如果不调用get、set或者remove方法，那么Value对象将会一直存在。</p>
+<p>Netty实现的FastThreadLocal底层也是通过维护Key-value对象实现的，与Java原生ThreadLocal使用ThreadLocal作为Key不同的是，FastThreadLocal通过保存数组下标实现了对value的快速访问。同时FastThreadLocal也实现了多种方式避免了内存泄漏问题，后面会详细介绍到。</p>
+<h1 id="FastThreadLocal及其相关类"><a href="#FastThreadLocal及其相关类" class="headerlink" title="FastThreadLocal及其相关类"></a>FastThreadLocal及其相关类</h1><p>Netty除了实现了FastThreadLocal以外，还在Java的Thread基础上实现了自己的FastThreadLocalThread来搭配前者使用。此外，考虑到了兼容性，也可以只是用FastThreadLoca而不使用FastThreadLocalThread，只不过这个时候，FastThreadLocal效率会低一点，后面也会讲到。</p>
+<p>先来看一下FastThreadLocalThread内部的两个成员变量，cleanupFastThreadLocals和threadLocalMap，：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">FastThreadLocalThread</span> <span class="keyword">extends</span> <span class="title">Thread</span> </span>&#123;</span><br><span class="line">    <span class="comment">// This will be set to true if we have a chance to wrap the Runnable.</span></span><br><span class="line">    <span class="comment">//与主动清理有关，可以先留意下</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">boolean</span> cleanupFastThreadLocals;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//存放数据的Map，用处类似于Thread中的ThreadLocalMap</span></span><br><span class="line">    <span class="keyword">private</span> InternalThreadLocalMap threadLocalMap;</span><br><span class="line"></span><br><span class="line">   ……</span><br><span class="line">   </span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>FastThreadLocalThread中比较重要的一个成员变量就是<strong>InternalThreadLocalMap</strong>了。<strong>InternalThreadLocalMap</strong>继承自<strong>UnpaddedInternalThreadLocalMap</strong>，<strong>UnpaddedInternalThreadLocalMap</strong>中主要定义了一系列变量，包括存储Value的数组，分配唯一index的原子类等等。而<strong>InternalThreadLocalMap</strong>中实现了分配index、存储/获取对象、扩容等方法。</p>
+<p>我们来看一下源码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//首先是父类UnpaddedInternalThreadLocalMap </span></span><br><span class="line"><span class="class"><span class="keyword">class</span> <span class="title">UnpaddedInternalThreadLocalMap</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//如过用的是普通的Thread，则需要依靠ThreadLocal获取InternalThreadLocalMap</span></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">final</span> ThreadLocal&lt;InternalThreadLocalMap&gt; slowThreadLocalMap = <span class="keyword">new</span> ThreadLocal&lt;InternalThreadLocalMap&gt;();</span><br><span class="line"></span><br><span class="line">    <span class="comment">//原子类，用于分配给每个FastThreadLocal唯一index</span></span><br><span class="line">    <span class="keyword">static</span> <span class="keyword">final</span> AtomicInteger nextIndex = <span class="keyword">new</span> AtomicInteger();</span><br><span class="line"></span><br><span class="line">    <span class="comment">/** Used by &#123;<span class="doctag">@link</span> FastThreadLocal&#125; */</span></span><br><span class="line">    <span class="comment">//这个就是用来存储Value对象的数组了</span></span><br><span class="line">    Object[] indexedVariables;</span><br><span class="line"></span><br><span class="line">   省略号……</span><br><span class="line"></span><br><span class="line">    UnpaddedInternalThreadLocalMap(Object[] indexedVariables) &#123;</span><br><span class="line">        <span class="keyword">this</span>.indexedVariables = indexedVariables;</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"><span class="comment">//再来看一下InternalThreadLocalMap（内容有点多，挑些关键的）</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">InternalThreadLocalMap</span> <span class="keyword">extends</span> <span class="title">UnpaddedInternalThreadLocalMap</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> InternalLogger logger = InternalLoggerFactory.getInstance(InternalThreadLocalMap<span class="class">.<span class="keyword">class</span>)</span>;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> DEFAULT_ARRAY_LIST_INITIAL_CAPACITY = <span class="number">8</span>;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> STRING_BUILDER_INITIAL_SIZE;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> STRING_BUILDER_MAX_SIZE;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//数组存储的默认对象</span></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> Object UNSET = <span class="keyword">new</span> Object();</span><br><span class="line"></span><br><span class="line">    <span class="keyword">private</span> BitSet cleanerFlags;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//调用父类构造函数，传入数组</span></span><br><span class="line">   <span class="function"><span class="keyword">private</span> <span class="title">InternalThreadLocalMap</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="keyword">super</span>(newIndexedVariableTable());</span><br><span class="line">   &#125;</span><br><span class="line">   <span class="comment">//数组默认大小为32，并填充默认的UNSET对象</span></span><br><span class="line">   <span class="keyword">private</span> <span class="keyword">static</span> Object[] newIndexedVariableTable() &#123;</span><br><span class="line">        Object[] array = <span class="keyword">new</span> Object[<span class="number">32</span>];</span><br><span class="line">        Arrays.fill(array, UNSET);</span><br><span class="line">        <span class="keyword">return</span> array;</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//每一个FastThreadLocal在初始化的时候都会调用这个方法</span></span><br><span class="line">   <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">nextVariableIndex</span><span class="params">()</span> </span>&#123;</span><br><span class="line">         <span class="comment">//获取全局唯一的自增index，由于是原子类，可以保证线程安全</span></span><br><span class="line">        <span class="keyword">int</span> index = nextIndex.getAndIncrement();</span><br><span class="line">        <span class="comment">//如果index&lt;0，说明FastThreadLocal定义太多了，导致index超出范围</span></span><br><span class="line">        <span class="keyword">if</span> (index &lt; <span class="number">0</span>) &#123;</span><br><span class="line">            nextIndex.decrementAndGet();</span><br><span class="line">            <span class="keyword">throw</span> <span class="keyword">new</span> IllegalStateException(<span class="string">"too many thread-local indexed variables"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> index;</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>InternalThreadLocalMap中数组大小默认为32，在FastThreadLocal构造方法中会调用上面的InternalThreadLocalMap.nextVariableIndex()方法获取FTL在该FastThreadLocalThread.threadLocalMap数组下标，因为InternalThreadLocalMap.nextVariableIndex()使用静态域nextIndex递增维护所有FastThreadLocal的下标，会造成如果FastThreadLocal下标大于其对应FastThreadLocalThread.threadLocalMap数组的大小，会进行数组的自动扩容。</p>
+<p>值得一提的是，为了避免伪共享（false sharing）问题，其使用了缓存行填充技术，在类定义中声明了如下long字段进行填充，具体可以参考Disruptor相关文献，例如美团技术团队的<a href="https://tech.meituan.com/2016/11/18/disruptor.html" target="_blank" rel="noopener">文章</a>。在Java8中可以使用@sun.misc.Contended注解避免伪共享问题。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// Cache line padding (must be public)</span></span><br><span class="line"><span class="comment">// With CompressedOops enabled, an instance of this class should occupy at least 128 bytes.</span></span><br><span class="line"><span class="keyword">public</span> <span class="keyword">long</span> rp1, rp2, rp3, rp4, rp5, rp6, rp7, rp8, rp9;</span><br></pre></td></tr></table></figure>
+<p>最后，我们来看一下今天的主角FastThreadLocal：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">FastThreadLocal</span>&lt;<span class="title">V</span>&gt; </span>&#123;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//数组的第一个元素永远是固定的</span></span><br><span class="line">   <span class="comment">//如果实际调用了其set或get函数，会在该FastThreadLocalThread.threadLocalMap数组的variablesToRemoveIndex下标处放置一个IdentityHashMap，并将该FTL放入IdentityHashMap中，在后续清理时会取出variablesToRemoveIndex下标处的IdentityHashMap进行清理</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> variablesToRemoveIndex = InternalThreadLocalMap.nextVariableIndex();</span><br><span class="line"></span><br><span class="line">   <span class="comment">//这就是每个FastThreadLocal的唯一index</span></span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> <span class="keyword">int</span> index;</span><br><span class="line">   </span><br><span class="line">   <span class="comment">//初始化的时候会赋予index全剧唯一递增id</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">FastThreadLocal</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        index = InternalThreadLocalMap.nextVariableIndex();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    省略号……</span><br></pre></td></tr></table></figure>
+
+<h1 id="变量的设置和获取"><a href="#变量的设置和获取" class="headerlink" title="变量的设置和获取"></a>变量的设置和获取</h1><p>ThreadLocal最常用的方法就是set()和get()</p>
+<h2 id="set"><a href="#set" class="headerlink" title="set"></a>set</h2><p>直接上源码，看源码注释即可：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * Set the value for the current thread.</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">set</span><span class="params">(V value)</span> </span>&#123;</span><br><span class="line">   <span class="comment">//如果设置的值不为默认填充的UNSET才进行设置</span></span><br><span class="line">    <span class="keyword">if</span> (value != InternalThreadLocalMap.UNSET) &#123;</span><br><span class="line">       <span class="comment">//获取当前线程的InternalThreadLocalMap</span></span><br><span class="line">        InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();</span><br><span class="line">        <span class="comment">//在map对象中放置该值</span></span><br><span class="line">        setKnownNotUnset(threadLocalMap, value);</span><br><span class="line">    &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">       <span class="comment">//如果放置的对象为UNSET，则表示清理，会对该FTL进行清理</span></span><br><span class="line">        remove();</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>总的来说分为3步：</p>
+<ul>
+<li>判断value是否为默认填充的UNSET</li>
+<li>获取当前线程的InternalThreadLocalMap</li>
+<li>设置value</li>
+</ul>
+<p>一个个来，先看一下如何获取当前线程的InternalThreadLocalMap：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="comment">//调用InternalThreadLocalMap的静态方法get()</span></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> InternalThreadLocalMap <span class="title">get</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    <span class="comment">//获取当前线程</span></span><br><span class="line">     Thread thread = Thread.currentThread();</span><br><span class="line">     <span class="comment">//如果是FastThreadLocalThread，则返回fasetGet方法（显然，要快）</span></span><br><span class="line">     <span class="keyword">if</span> (thread <span class="keyword">instanceof</span> FastThreadLocalThread) &#123;</span><br><span class="line">         <span class="keyword">return</span> fastGet((FastThreadLocalThread) thread);</span><br><span class="line">     &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">//如果是普通的Thread，返回slowGet</span></span><br><span class="line">         <span class="keyword">return</span> slowGet();</span><br><span class="line">     &#125;</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> InternalThreadLocalMap <span class="title">fastGet</span><span class="params">(FastThreadLocalThread thread)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//获取线程内的InternalThreadLocalMap变量</span></span><br><span class="line">     InternalThreadLocalMap threadLocalMap = thread.threadLocalMap();</span><br><span class="line">     </span><br><span class="line">     <span class="keyword">if</span> (threadLocalMap == <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="comment">//如果是第一次获取，初始化并设置</span></span><br><span class="line">         thread.setThreadLocalMap(threadLocalMap = <span class="keyword">new</span> InternalThreadLocalMap());</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="comment">//返回</span></span><br><span class="line">     <span class="keyword">return</span> threadLocalMap;</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//如果是普通的Thread，就需要借助UnpaddedInternalThreadLocalMap中的ThreadLocal变量来获取InternalThreadLocalMap</span></span><br><span class="line"> <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> InternalThreadLocalMap <span class="title">slowGet</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="comment">//获取ThreadLocal变量，InternalThreadLocalMap是存放在这个ThreadLocal中的</span></span><br><span class="line">     ThreadLocal&lt;InternalThreadLocalMap&gt; slowThreadLocalMap = UnpaddedInternalThreadLocalMap.slowThreadLocalMap;</span><br><span class="line">     <span class="comment">//这里就是普通的ThreadLocal变量获取</span></span><br><span class="line">     InternalThreadLocalMap ret = slowThreadLocalMap.get();</span><br><span class="line">     </span><br><span class="line">     <span class="keyword">if</span> (ret == <span class="keyword">null</span>) &#123;</span><br><span class="line">        <span class="comment">//如果是第一次是获取，则初始化InternalThreadLocalMap并设置</span></span><br><span class="line">         ret = <span class="keyword">new</span> InternalThreadLocalMap();</span><br><span class="line">         slowThreadLocalMap.set(ret);</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="comment">//返回</span></span><br><span class="line">     <span class="keyword">return</span> ret;</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<p>获取InternalThreadLocalMap之后，便是设置value了</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">setKnownNotUnset</span><span class="params">(InternalThreadLocalMap threadLocalMap, V value)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//通过index，在数组的对应位置上设置value</span></span><br><span class="line">     <span class="keyword">if</span> (threadLocalMap.setIndexedVariable(index, value)) &#123;</span><br><span class="line">    <span class="comment">//第一次放置成功或者数组扩容之后，将该FastThreadLocal加入到variablesToRemoveIndex下标的IdentityHashMap，等待后续清理</span></span><br><span class="line">         addToVariablesToRemove(threadLocalMap, <span class="keyword">this</span>);</span><br><span class="line">     &#125;</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"> <span class="function"><span class="keyword">public</span> <span class="keyword">boolean</span> <span class="title">setIndexedVariable</span><span class="params">(<span class="keyword">int</span> index, Object value)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//获取数组</span></span><br><span class="line">     Object[] lookup = indexedVariables;</span><br><span class="line">     <span class="comment">//如果index&lt;数组的长度，则直接插入就可以了</span></span><br><span class="line">     <span class="keyword">if</span> (index &lt; lookup.length) &#123;</span><br><span class="line">         Object oldValue = lookup[index];</span><br><span class="line">         lookup[index] = value;</span><br><span class="line">        <span class="comment">// 如果返回true，则说明是第一次插入</span></span><br><span class="line">         <span class="keyword">return</span> oldValue == UNSET;</span><br><span class="line">     &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">//否则，需要对数组进行扩容</span></span><br><span class="line">         expandIndexedVariableTableAndSet(index, value);</span><br><span class="line">         <span class="keyword">return</span> <span class="keyword">true</span>;</span><br><span class="line">     &#125;</span><br><span class="line"> &#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//扩容函数</span></span><br><span class="line"> <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">expandIndexedVariableTableAndSet</span><span class="params">(<span class="keyword">int</span> index, Object value)</span> </span>&#123;</span><br><span class="line">     Object[] oldArray = indexedVariables;</span><br><span class="line">     <span class="keyword">final</span> <span class="keyword">int</span> oldCapacity = oldArray.length;</span><br><span class="line">     <span class="keyword">int</span> newCapacity = index;</span><br><span class="line">     <span class="comment">//计算大于index的最小2的指数次幂</span></span><br><span class="line">     newCapacity |= newCapacity &gt;&gt;&gt;  <span class="number">1</span>;</span><br><span class="line">     newCapacity |= newCapacity &gt;&gt;&gt;  <span class="number">2</span>;</span><br><span class="line">     newCapacity |= newCapacity &gt;&gt;&gt;  <span class="number">4</span>;</span><br><span class="line">     newCapacity |= newCapacity &gt;&gt;&gt;  <span class="number">8</span>;</span><br><span class="line">     newCapacity |= newCapacity &gt;&gt;&gt; <span class="number">16</span>;</span><br><span class="line">     newCapacity ++;</span><br><span class="line">    </span><br><span class="line">     Object[] newArray = Arrays.copyOf(oldArray, newCapacity);</span><br><span class="line">     <span class="comment">//新扩容的部分，填充UNSET</span></span><br><span class="line">     Arrays.fill(newArray, oldCapacity, newArray.length, UNSET);</span><br><span class="line">     <span class="comment">//设置value</span></span><br><span class="line">     newArray[index] = value;</span><br><span class="line">     <span class="comment">//设置新的数组</span></span><br><span class="line">     indexedVariables = newArray;</span><br><span class="line"> &#125;</span><br><span class="line"><span class="comment">//加入到variablesToRemoveIndex下标的IdentityHashMap，IdentityHashMap的特性可以保证同一个实例不会被多次加入到该位置</span></span><br><span class="line"> <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">addToVariablesToRemove</span><span class="params">(InternalThreadLocalMap threadLocalMap, FastThreadLocal&lt;?&gt; variable)</span> </span>&#123;</span><br><span class="line">    <span class="comment">//获取variablesToRemoveIndex下标处的IdentityHashMap</span></span><br><span class="line">     Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);</span><br><span class="line">     Set&lt;FastThreadLocal&lt;?&gt;&gt; variablesToRemove;</span><br><span class="line">     <span class="comment">//如果是第一次获取，则初始化IdentityHashMap</span></span><br><span class="line">     <span class="keyword">if</span> (v == InternalThreadLocalMap.UNSET || v == <span class="keyword">null</span>) &#123;</span><br><span class="line">         variablesToRemove = Collections.newSetFromMap(<span class="keyword">new</span> IdentityHashMap&lt;FastThreadLocal&lt;?&gt;, Boolean&gt;());</span><br><span class="line">         threadLocalMap.setIndexedVariable(variablesToRemoveIndex, variablesToRemove);</span><br><span class="line">     &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">        <span class="comment">//如果不是第一次获取，将元素v转型</span></span><br><span class="line">         variablesToRemove = (Set&lt;FastThreadLocal&lt;?&gt;&gt;) v;</span><br><span class="line">     &#125;</span><br><span class="line">     <span class="comment">//将FastThreadLocal添加至IdentityHashMap中</span></span><br><span class="line">     variablesToRemove.add(variable);</span><br><span class="line"> &#125;</span><br></pre></td></tr></table></figure>
+<p>至此，set操作已经完成了。</p>
+<h2 id="get"><a href="#get" class="headerlink" title="get"></a>get</h2><p>FastThreadLocal的get方法相对而言比较简单了。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> V <span class="title">get</span><span class="params">()</span> </span>&#123;</span><br><span class="line">        <span class="comment">//获取当前线程的InternalThreadLocalMap</span></span><br><span class="line">       InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.get();</span><br><span class="line">       <span class="comment">//根据index获取对应位置的value</span></span><br><span class="line">       Object v = threadLocalMap.indexedVariable(index);</span><br><span class="line">       </span><br><span class="line">       <span class="keyword">if</span> (v != InternalThreadLocalMap.UNSET) &#123;</span><br><span class="line">          <span class="comment">//如果不是UNSET，则说明该元素已经设置过了，直接返回即可</span></span><br><span class="line">           <span class="keyword">return</span> (V) v;</span><br><span class="line">       &#125;</span><br><span class="line">        <span class="comment">//如果是默认值UNSET，则返回initialize初始化后的对象</span></span><br><span class="line">       <span class="keyword">return</span> initialize(threadLocalMap);</span><br><span class="line">   &#125;</span><br><span class="line"></span><br><span class="line">   <span class="function"><span class="keyword">private</span> V <span class="title">initialize</span><span class="params">(InternalThreadLocalMap threadLocalMap)</span> </span>&#123;</span><br><span class="line">       V v = <span class="keyword">null</span>;</span><br><span class="line">       <span class="keyword">try</span> &#123;</span><br><span class="line">          <span class="comment">//在FastThreadLocal中initialValue()返回null；</span></span><br><span class="line">           v = initialValue();</span><br><span class="line">       &#125; <span class="keyword">catch</span> (Exception e) &#123;</span><br><span class="line">           PlatformDependent.throwException(e);</span><br><span class="line">       &#125;</span><br><span class="line">        <span class="comment">//设置该下标处的值为初始值</span></span><br><span class="line">       threadLocalMap.setIndexedVariable(index, v);</span><br><span class="line">       addToVariablesToRemove(threadLocalMap, <span class="keyword">this</span>);</span><br><span class="line">       <span class="keyword">return</span> v;</span><br><span class="line">   &#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="变量的自动清理"><a href="#变量的自动清理" class="headerlink" title="变量的自动清理"></a>变量的自动清理</h1><p>FastThreadLocal还有一个改进的地方在于其解决了ThreadLocal内存泄漏的问题。</p>
+<p>FastThreadLocal变量的清理主要有两种：手动和主动。手动就是使用完之后主动调用remove方法，没啥可说的。</p>
+<p>这里就来看一下FastThreadLocal是如何自动清理的。</p>
+<p>之前介绍FastThreadLocalThread类时，提到其有一个字段为cleanupFastThreadLocals，这个字段则用于标识该线程在结束时是否会主动清理FTL。直接上源码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br></pre></td><td class="code"><pre><span class="line">   <span class="comment">//这是一个FastThreadLocalThread的构造方法，可以传入一个Runnable对象</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="title">FastThreadLocalThread</span><span class="params">(Runnable target)</span> </span>&#123;</span><br><span class="line">       <span class="comment">//需要对Runnable进行封装，返回封装后的FastThreadLocalRunnable对象</span></span><br><span class="line">        <span class="keyword">super</span>(FastThreadLocalRunnable.wrap(target));</span><br><span class="line">        cleanupFastThreadLocals = <span class="keyword">true</span>;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line"><span class="keyword">final</span> <span class="class"><span class="keyword">class</span> <span class="title">FastThreadLocalRunnable</span> <span class="keyword">implements</span> <span class="title">Runnable</span> </span>&#123;</span><br><span class="line">    <span class="keyword">private</span> <span class="keyword">final</span> Runnable runnable;</span><br><span class="line"></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="title">FastThreadLocalRunnable</span><span class="params">(Runnable runnable)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">this</span>.runnable = ObjectUtil.checkNotNull(runnable, <span class="string">"runnable"</span>);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">   <span class="comment">//重点在run方法上</span></span><br><span class="line">    <span class="meta">@Override</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">run</span><span class="params">()</span> </span>&#123;</span><br><span class="line">       <span class="comment">//任务的运行在try代码块中，运行结束后会调用finally代码块中的FastThreadLocal.removeAll()方法</span></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            runnable.run();</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">           <span class="comment">//在这里，任务运行结束后，将自动对FastThreadLocal进行清理</span></span><br><span class="line">            FastThreadLocal.removeAll();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line">   <span class="comment">//对Runnable对象进行封装</span></span><br><span class="line">    <span class="function"><span class="keyword">static</span> Runnable <span class="title">wrap</span><span class="params">(Runnable runnable)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> runnable <span class="keyword">instanceof</span> FastThreadLocalRunnable ? runnable : <span class="keyword">new</span> FastThreadLocalRunnable(runnable);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//调用的removeAll方法如下</span></span><br><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">void</span> <span class="title">removeAll</span><span class="params">()</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">         <span class="comment">//首先看能够获取该线程对应的threadLocalMap，如果从来没有，说明没有变量要清理</span></span><br><span class="line">        InternalThreadLocalMap threadLocalMap = InternalThreadLocalMap.getIfSet();</span><br><span class="line">        <span class="keyword">if</span> (threadLocalMap == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">           <span class="comment">//获取到存放FastThreadLocal的IdentityHashMap</span></span><br><span class="line">            Object v = threadLocalMap.indexedVariable(variablesToRemoveIndex);</span><br><span class="line">            <span class="keyword">if</span> (v != <span class="keyword">null</span> &amp;&amp; v != InternalThreadLocalMap.UNSET) &#123;</span><br><span class="line">                <span class="meta">@SuppressWarnings</span>(<span class="string">"unchecked"</span>)</span><br><span class="line">                Set&lt;FastThreadLocal&lt;?&gt;&gt; variablesToRemove = (Set&lt;FastThreadLocal&lt;?&gt;&gt;) v;</span><br><span class="line">                FastThreadLocal&lt;?&gt;[] variablesToRemoveArray =</span><br><span class="line">                        variablesToRemove.toArray(<span class="keyword">new</span> FastThreadLocal[<span class="number">0</span>]);</span><br><span class="line">               <span class="comment">//对其中的每一个FastThreadLocal调用remove方法</span></span><br><span class="line">                <span class="keyword">for</span> (FastThreadLocal&lt;?&gt; tlv: variablesToRemoveArray) &#123;</span><br><span class="line">                    tlv.remove(threadLocalMap);</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">finally</span> &#123;</span><br><span class="line">           <span class="comment">//最后把该线程的InternalThreadLocalMap设置为null</span></span><br><span class="line">            InternalThreadLocalMap.remove();</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+<p>总的来说，FastThreadLocalThread会将所有执行的Runnable包装成FastThreadLocalRunnable，在运行完任务后会调用finally代码块中的FastThreadLocal.removeAll()方法，将该线程对应的InternalThreadLocalMap本身以及其中包含的变量清除掉。</p>
+
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+        <div class="declare">
+          <ul class="post-copyright">
+            <li>
+              <i class="ri-copyright-line"></i>
+              <strong>版权声明： </strong s>
+              本博客所有文章除特别声明外，均采用 <a href="https://www.apache.org/licenses/LICENSE-2.0.html" rel="external nofollow"
+                target="_blank">Apache License 2.0</a> 许可协议。转载请注明出处！
+            </li>
+          </ul>
+        </div>
+        
+    <footer class="article-footer">
+      
+          
+<div class="share-btn">
+      <span class="share-sns share-outer">
+        <i class="ri-share-forward-line"></i>
+        分享
+      </span>
+      <div class="share-wrap">
+        <i class="arrow"></i>
+        <div class="share-icons">
+          
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="ri-weibo-fill"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="ri-wechat-fill"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="ri-qq-fill"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="ri-douban-line"></i>
+          </a>
+          <!-- <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a> -->
+          
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="ri-facebook-circle-fill"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="ri-twitter-fill"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="ri-google-fill"></i>
+          </a>
+        </div>
+      </div>
+</div>
+
+<div class="wx-share-modal">
+    <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://yoursite.com/2020/04/05/Netty%E4%B8%AD%E7%9A%84FastThreadLocal/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div id="share-mask"></div>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Netty/" rel="tag">Netty</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+  
+  <nav class="article-nav">
+    
+    
+      <a href="/2020/03/09/Netty%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%E4%B9%8B%E7%BA%BF%E7%A8%8B%E6%B1%A0/" class="article-nav-link">
+        <strong class="article-nav-caption">下一篇</strong>
+        <div class="article-nav-title">Netty源码解析之线程池</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+  
+<!-- valine评论 -->
+<div id="vcomments-box">
+    <div id="vcomments">
+    </div>
+</div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        app_id: '',
+        app_key: '',
+        path: window.location.pathname,
+        notify: 'false',
+        verify: 'false',
+        avatar: 'mp',
+        placeholder: '给我的文章加点评论吧~',
+        recordIP: true
+    });
+    const infoEle = document.querySelector('#vcomments .info');
+    if (infoEle && infoEle.childNodes && infoEle.childNodes.length > 0) {
+        infoEle.childNodes.forEach(function (item) {
+            item.parentNode.removeChild(item);
+        });
+    }
+</script>
+<style>
+    #vcomments-box {
+        padding: 5px 30px;
+    }
+
+    @media screen and (max-width: 800px) {
+        #vcomments-box {
+            padding: 5px 0px;
+        }
+    }
+
+    #vcomments-box #vcomments {
+        background-color: #fff;
+    }
+
+    .v .vlist .vcard .vh {
+        padding-right: 20px;
+    }
+
+    .v .vlist .vcard {
+        padding-left: 10px;
+    }
+</style>
+
+  
+
+  
+  
+  
+
+</article>
+</section>
+      <footer class="footer">
+  <div class="outer">
+    <ul class="list-inline">
+      <li>
+        &copy;
+        2020
+        Karthur
+      </li>
+      <li>
+        
+      </li>
+    </ul>
+    <ul class="list-inline">
+      <li>
+        
+        
+        <span>
+  <i>PV:<span id="busuanzi_value_page_pv"></span></i>
+  <i>UV:<span id="busuanzi_value_site_uv"></span></i>
+</span>
+        
+      </li>
+      
+      <li>
+        <!-- cnzz统计 -->
+        
+        <script type="text/javascript" src='https://s9.cnzz.com/z_stat.php?id=1278069914&amp;web_id=1278069914'></script>
+        
+      </li>
+    </ul>
+  </div>
+</footer>
+      <div class="to_top">
+        <div class="totop" id="totop">
+  <i class="ri-arrow-up-line"></i>
+</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+  <div class="logo">
+    <a href="/"><img src="/images/ayer-side.svg" alt="愿那颗星星一直指引你"></a>
+  </div>
+  
+  <ul class="nav nav-main">
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/">主页</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/archives">归档</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/categories">分类</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/tags">标签</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/about">关于我</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="https://github.com/KArthurL" target="_blank" rel="noopener">github</a>
+    </li>
+    
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      
+      <a class="nav-item-link nav-item-search"  title="Search">
+        <i class="ri-search-line"></i>
+      </a>
+      
+      
+      <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+        <i class="ri-rss-line"></i>
+      </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+    </aside>
+    <div id="mask"></div>
+
+<!-- #reward -->
+<div id="reward">
+  <span class="close"><i class="ri-close-line"></i></span>
+  <p class="reward-p"><i class="ri-cup-line"></i>请我喝杯咖啡吧~</p>
+  <div class="reward-box">
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/alipay.jpg">
+      <span class="reward-type">支付宝</span>
+    </div>
+    
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/wechat.jpg">
+      <span class="reward-type">微信</span>
+    </div>
+    
+  </div>
+</div>
+    
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+<script src="/js/share.js"></script>
+
+
+
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script>
+  try {
+    var typed = new Typed("#subtitle", {
+    strings: ['一闪一闪亮晶晶','满天都是小星星','海上生明月，天涯共此时'],
+    startDelay: 0,
+    typeSpeed: 200,
+    loop: true,
+    backSpeed: 100,
+    showCursor: true
+    });
+  } catch (err) {
+  }
+  
+</script>
+
+
+
+
+<script src="/js/tocbot.min.js"></script>
+
+<script>
+  // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+  tocbot.init({
+    tocSelector: '.tocbot',
+    contentSelector: '.article-entry',
+    headingSelector: 'h1, h2, h3, h4, h5, h6',
+    hasInnerContainers: true,
+    scrollSmooth: true,
+    scrollContainer:'main',
+    positionFixedSelector: '.tocbot',
+    positionFixedClass: 'is-position-fixed',
+    fixedSidebarOffset: 'auto',
+    onClick: (e) => {
+      $('.toc-link').removeClass('is-active-link');
+      $(`a[href=${e.target.hash}]`).addClass('is-active-link');
+      $(e.target.hash).scrollIntoView();
+      return false;
+    }
+  });
+</script>
+
+
+<script>
+  var ayerConfig = {
+    mathjax: false
+  }
+</script>
+
+
+<script src="/js/ayer.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.css">
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" style="display:none" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css">
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"></script>
+
+<script>
+    function viewer_init() {
+        let pswpElement = document.querySelectorAll('.pswp')[0];
+        let $imgArr = document.querySelectorAll(('.article-entry img:not(.reward-img)'))
+
+        $imgArr.forEach(($em, i) => {
+            $em.onclick = () => {
+                // slider展开状态
+                // todo: 这样不好，后面改成状态
+                if (document.querySelector('.left-col.show')) return
+                let items = []
+                $imgArr.forEach(($em2, i2) => {
+                    let img = $em2.getAttribute('data-idx', i2)
+                    let src = $em2.getAttribute('data-target') || $em2.getAttribute('src')
+                    let title = $em2.getAttribute('alt')
+                    // 获得原图尺寸
+                    const image = new Image()
+                    image.src = src
+                    items.push({
+                        src: src,
+                        w: image.width || $em2.width,
+                        h: image.height || $em2.height,
+                        title: title
+                    })
+                })
+                var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, {
+                    index: parseInt(i)
+                });
+                gallery.init()
+            }
+        })
+    }
+    viewer_init()
+</script>
+
+
+
+
+<script type="text/javascript" src="https://js.users.51.la/20544303.js"></script>
+
+    
+  </div>
+</body>
+
+</html>
