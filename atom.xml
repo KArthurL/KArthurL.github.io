@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-04-10T13:51:59.391Z</updated>
+  <updated>2020-04-17T06:53:15.611Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,27 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>春招实习之旅</title>
+    <link href="http://yoursite.com/2020/04/17/%E6%98%A5%E6%8B%9B%E5%AE%9E%E4%B9%A0%E4%B9%8B%E6%97%85/"/>
+    <id>http://yoursite.com/2020/04/17/%E6%98%A5%E6%8B%9B%E5%AE%9E%E4%B9%A0%E4%B9%8B%E6%97%85/</id>
+    <published>2020-04-17T06:36:02.000Z</published>
+    <updated>2020-04-17T06:53:15.611Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;&amp;emsp;&amp;emsp;为期两个月的春招实习终于告一段落了。。只能说所有的付出都是值得的……&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="杂谈" scheme="http://yoursite.com/categories/%E6%9D%82%E8%B0%88/"/>
+    
+    
+      <category term="杂谈" scheme="http://yoursite.com/tags/%E6%9D%82%E8%B0%88/"/>
+    
+  </entry>
   
   <entry>
     <title>Netty中的FastThreadLocal</title>
@@ -124,7 +145,7 @@
     <link href="http://yoursite.com/2020/02/28/hello-world/"/>
     <id>http://yoursite.com/2020/02/28/hello-world/</id>
     <published>2020-02-28T12:50:46.705Z</published>
-    <updated>2020-04-13T03:19:02.858Z</updated>
+    <updated>2020-04-17T06:53:19.287Z</updated>
     
     <summary type="html">
     
@@ -484,29 +505,6 @@
     
       &lt;p&gt;之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。&lt;/p&gt;
 &lt;p&gt;本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。&lt;/p&gt;
-    
-    </summary>
-    
-    
-      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
-    
-    
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
-      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>内存可见性、原子性和重排序</title>
-    <link href="http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/"/>
-    <id>http://yoursite.com/2020/02/03/%E5%86%85%E5%AD%98%E5%8F%AF%E8%A7%81%E6%80%A7%E3%80%81%E5%8E%9F%E5%AD%90%E6%80%A7%E5%92%8C%E9%87%8D%E6%8E%92%E5%BA%8F/</id>
-    <published>2020-02-03T14:11:26.000Z</published>
-    <updated>2020-03-03T10:33:52.712Z</updated>
-    
-    <summary type="html">
-    
-      &lt;p&gt;在上一篇文章中，笔者简单介绍了下&lt;a href=&quot;https://karthurl.github.io/2020/02/29/Java%E5%B9%B6%E5%8F%91%E5%9F%BA%E7%A1%80/&quot; target=&quot;_blank&quot; rel=&quot;noopener&quot;&gt;Java内存模型&lt;/a&gt;。本文承接上文，主要以代码+图片的形式呈现给大家，其主要目的是让大家对于并发程序中的内存可见性、原子性以及重排序有一定的了解。这三个问题也是并发程序为什么难写的原因。&lt;/p&gt;
     
     </summary>
     
