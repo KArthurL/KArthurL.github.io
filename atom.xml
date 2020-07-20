@@ -6,7 +6,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://yoursite.com/"/>
-  <updated>2020-04-17T06:53:15.611Z</updated>
+  <updated>2020-07-20T16:07:08.599Z</updated>
   <id>http://yoursite.com/</id>
   
   <author>
@@ -15,6 +15,31 @@
   </author>
   
   <generator uri="https://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>服务线程隔离的RPC框架</title>
+    <link href="http://yoursite.com/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/"/>
+    <id>http://yoursite.com/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/</id>
+    <published>2020-07-19T15:49:06.000Z</published>
+    <updated>2020-07-20T16:07:08.599Z</updated>
+    
+    <summary type="html">
+    
+      &lt;p&gt;自从春招实习之后，眼界真的就一下子开阔起来了，也感觉到了以前的自己好菜啊（虽然现在也是，笑～）。果然学习之路不能停！&lt;/p&gt;
+&lt;p&gt;微服务如今应当是一个优秀的程序员必须学习的一种架构思想，而RPC框架作为微服务的核心，不说读一遍源码吧，起码它的实现原理还是应该知道的。&lt;/p&gt;
+&lt;p&gt;然而目前的RPC服务框架，大多存在一个问题，就是当服务提供端Provider应用中，有的服务流量大，耗时长，导致线程池资源被这些服务占尽，从而影响同一应用中的其他服务正常提供。为此，这次博文主要介绍一下我对于这方面的思考。&lt;/p&gt;
+    
+    </summary>
+    
+    
+      <category term="框架" scheme="http://yoursite.com/categories/%E6%A1%86%E6%9E%B6/"/>
+    
+    
+      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
+    
+      <category term="RPC" scheme="http://yoursite.com/tags/RPC/"/>
+    
+  </entry>
   
   <entry>
     <title>春招实习之旅</title>
@@ -145,7 +170,7 @@
     <link href="http://yoursite.com/2020/02/28/hello-world/"/>
     <id>http://yoursite.com/2020/02/28/hello-world/</id>
     <published>2020-02-28T12:50:46.705Z</published>
-    <updated>2020-04-17T06:56:15.208Z</updated>
+    <updated>2020-07-19T15:54:10.779Z</updated>
     
     <summary type="html">
     
@@ -481,30 +506,6 @@
     
       &lt;p&gt;在讲Java并发编程的时候，volatile关键字和CAS操作都扮演着重要的角色。本文之所以把这两个放在一起讲，是因为两者的有机结合能实现锁的功能。volatile能保证内存可见性和防止重排序，CAS能保证操作的原子性（其实也能保证可见性），两者结合几乎拓展出了整个Java的并发包，Java中Lock的底层实现AQS所依赖的也正是volatile和CAS。&lt;/p&gt;
 &lt;p&gt;话不多说，现在让我们一起揭开它们的神秘面纱吧～&lt;/p&gt;
-    
-    </summary>
-    
-    
-      <category term="Java并发" scheme="http://yoursite.com/categories/Java%E5%B9%B6%E5%8F%91/"/>
-    
-    
-      <category term="原创" scheme="http://yoursite.com/tags/%E5%8E%9F%E5%88%9B/"/>
-    
-      <category term="并发" scheme="http://yoursite.com/tags/%E5%B9%B6%E5%8F%91/"/>
-    
-  </entry>
-  
-  <entry>
-    <title>synchronized的原理和使用</title>
-    <link href="http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/"/>
-    <id>http://yoursite.com/2020/02/05/synchronized%E7%9A%84%E5%8E%9F%E7%90%86%E5%92%8C%E4%BD%BF%E7%94%A8/</id>
-    <published>2020-02-05T10:13:54.000Z</published>
-    <updated>2020-03-03T10:34:07.484Z</updated>
-    
-    <summary type="html">
-    
-      &lt;p&gt;之前的文章主要结合例子介绍了一些概念性的东西，比如JMM，并发的三大问题等。从本文开始，将陆续介绍一些Java中同步机制。&lt;/p&gt;
-&lt;p&gt;本文主要介绍的是Java中的synchronized关键字，从使用入手，慢慢阐述其实现原理以及使用时候等注意事项。&lt;/p&gt;
     
     </summary>
     

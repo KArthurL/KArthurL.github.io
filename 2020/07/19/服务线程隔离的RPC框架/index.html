@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+    
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>
+    服务线程隔离的RPC框架 |  愿那颗星星一直指引你
+  </title>
+  <meta name="generator" content="hexo-theme-yilia-plus">
+  
+  <link rel="shortcut icon" href="/favicon.ico" />
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+<script src="/js/pace.min.js"></script>
+
+
+  
+
+  
+
+<link rel="alternate" href="/atom.xml" title="愿那颗星星一直指引你" type="application/atom+xml">
+</head>
+
+</html>
+
+<body>
+  <div id="app">
+    <main class="content">
+      <section class="outer">
+  <article id="post-服务线程隔离的RPC框架" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h1 class="article-title sea-center" style="border-left:0" itemprop="name">
+  服务线程隔离的RPC框架
+</h1>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/" class="article-date">
+  <time datetime="2020-07-19T15:49:06.000Z" itemprop="datePublished">2020-07-19</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E6%A1%86%E6%9E%B6/">框架</a>
+  </div>
+
+      
+      
+<div class="word_count">
+    <span class="post-time">
+        <span class="post-meta-item-icon">
+            <i class="ri-quill-pen-line"></i>
+            <span class="post-meta-item-text"> 字数统计:</span>
+            <span class="post-count">3.2k字</span>
+        </span>
+    </span>
+
+    <span class="post-time">
+        &nbsp; | &nbsp;
+        <span class="post-meta-item-icon">
+            <i class="ri-book-open-line"></i>
+            <span class="post-meta-item-text"> 阅读时长≈</span>
+            <span class="post-count">11分钟</span>
+        </span>
+    </span>
+</div>
+
+      
+    </div>
+    
+
+    
+    
+    <div class="tocbot"></div>
+
+
+
+
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>自从春招实习之后，眼界真的就一下子开阔起来了，也感觉到了以前的自己好菜啊（虽然现在也是，笑～）。果然学习之路不能停！</p>
+<p>微服务如今应当是一个优秀的程序员必须学习的一种架构思想，而RPC框架作为微服务的核心，不说读一遍源码吧，起码它的实现原理还是应该知道的。</p>
+<p>然而目前的RPC服务框架，大多存在一个问题，就是当服务提供端Provider应用中，有的服务流量大，耗时长，导致线程池资源被这些服务占尽，从而影响同一应用中的其他服务正常提供。为此，这次博文主要介绍一下我对于这方面的思考。</p>
+<a id="more"></a>
+<h1 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h1><p>在进入正文之前，可以先看一下阿里中间件岛风大佬的这篇博文（<a href="https://www.cnkirito.moe/arthas-thread/" target="_blank" rel="noopener">传送门</a>），这篇博文复现了Dubbo应用中，线程池耗尽的场景。这其实在线上是十分普遍，解决方法无非是根据业务调整参数，或者引入其他的限流、资源隔离框架，例如Hystrix、Sentinel等，使得资源间互不干扰。其实本身Dubbo也可以对不同的服务配置不同的业务线程池（通过配置protocol）从而实现服务的资源隔离，但是这种方式的弊端在于，一旦服务增多，线程数量会迅速膨胀。线程池过多不便于统一管理，同时过多的线程所带来过多的上下文切换也会影响服务器性能。</p>
+<p>在绝大多数场景下，对服务资源的隔离可以通过开源框架Sentinel来实现，其通过配置某个服务的并发数，来达到限流和线程资源隔离的目的。坦白的讲，这已经能够满足绝大多数需求了，但是手动取配置这些参数还是比较有难度的，大多得靠大佬们的经验了，而且也不够灵活。</p>
+<p>我在学习的时候，也突发奇想，有没有可能不依赖外部的组件，而实现内部的服务资源隔离？再更进一步，有没有可能根据应用内各个服务的流量数据，对每个服务资源进行动态的分配和绑定呢？</p>
+<p>打个比方说，某个应用里存在A、B两个服务，100个线程。白天的时候，A服务的流量大，B服务的流量很小，那么在这个时间段内，我们的应用分配给A的资源理应更多。但是也不能全给A拿走了，B也得喝口汤，不然又会出现线程耗尽的情况，所以此时我们可能根据流量数据的比对分给A服务80个线程，B服务20个线程；而到了晚上，A服务没啥人用了，B服务流量来了，那我们就给B更多的资源，但也要保证A可用，比如说，A服务20线程，B服务80线程。</p>
+<p>我承认我一开始只是想简单写个RPC框架，学习实现原理而已。但突然有了这样一个想法，我就来了动力，想看看自己的想法行不行得通，下面我便介绍下我的思考，说的有不对的地方也欢迎大家指出和探讨。</p>
+<h1 id="服务线程隔离的三个组件"><a href="#服务线程隔离的三个组件" class="headerlink" title="服务线程隔离的三个组件"></a>服务线程隔离的三个组件</h1><p>借鉴了传统的RPC框架的实现原理后，我们只需要修改或者增加三样东西，就可以完成上述的功能，分别为：线程池、数据监控节点Metric和线程动态分配的Monitor。这三者之间的关系可以先看一下这张图有个大概的印象。</p>
+<p><img src="https://i.loli.net/2020/07/21/cAHgLVjfQmaXkGB.jpg" alt="三组件.jpg"></p>
+<h2 id="线程池"><a href="#线程池" class="headerlink" title="线程池"></a>线程池</h2><p>首先需要修改的自然是线程池。以Dubbo为例，其默认的线程池为fixed线程池，io线程接收到请求后，委托Dubbo线程池完成后续的处理，通过调用ExecutorService.execute。</p>
+<p>但是在这里，使用JDK中的线程池显然是行不通了。线程池中的Thread也不再是单纯的Thread，而需要更进一步的抽象。这里参考Netty中NioEventLoop的设计思想，将每条Thread抽象为一条Loop，其既是任务执行的本体Thread，也是ExecutorService的抽象，而所有Loop交由LoopGroup统一管理，由LoopGroup决定将任务提交至哪一个线程。这里我实现的比较简单，每个线程有个专属的id，通过拿到线程的id，将任务提交到对应的线程，原理可以参考下图：</p>
+<p><img src="https://i.loli.net/2020/07/20/3b9x4gNMS6tpAwa.jpg" alt="线程池.jpg"></p>
+<p>私以为核心在于维护服务与线程id的对应关系，以及在请求到来时，LoopGroup会根据请求中服务的类型，选择对应id的线程，并交由该线程去处理请求。</p>
+<h2 id="数据监控"><a href="#数据监控" class="headerlink" title="数据监控"></a>数据监控</h2><p>数据的监控相对来说是最好办的。这里我参考了Sentinel的实现，使用时间窗口法统计各个服务的流量数据，包括pass、success、rt、reject、excetpion等。（关于Sentinel中的时间窗口，后面有时间再专门写篇源码分析）</p>
+<p>而至于监控节点的形式，根据调用链路的具体实现不同，在Dubbo中可以是一个filter，而我因为将调用链路抽象为一个Pipeline，所以它作为Pipeline上的一个节点，参考下图：</p>
+<p><img src="https://i.loli.net/2020/07/20/ALZlpPX4C73xwzS.jpg" alt="pipeline.jpg"></p>
+<p>这里贴上MetricContext的关键源码：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">//处理请求时，pass+1，同时记录开始时间并保存在线程上下文中</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">handle</span><span class="params">(Object obj)</span> </span>&#123;</span><br><span class="line">    <span class="keyword">if</span>(obj <span class="keyword">instanceof</span> RpcRequest)&#123;</span><br><span class="line">        RpcContext rpcContext=RpcContext.getContext();</span><br><span class="line">        rpcContext.setStartTime(TimeUtil.currentTimeMillis());</span><br><span class="line">        paladinMetric.addPass(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//响应请求时，说明请求处理正常，则通过线程上下文拿到开始时间，</span></span><br><span class="line"><span class="comment">//计算出响应时间rt后将rt写入统计数据，同时success+1</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">response</span><span class="params">(Object obj)</span> </span>&#123;</span><br><span class="line">        RpcContext rpcContext=RpcContext.getContext();</span><br><span class="line">        Long startTime=rpcContext.getStartTime();</span><br><span class="line">        <span class="keyword">if</span>(startTime!=<span class="keyword">null</span>)&#123;</span><br><span class="line">            Long rt=TimeUtil.currentTimeMillis()-startTime;</span><br><span class="line">            paladinMetric.addRT(rt);</span><br><span class="line">            paladinMetric.addSuccess(<span class="number">1</span>);</span><br><span class="line">            logger.warn(rpcContext.getRpcRequest().getClassName()</span><br><span class="line">                    +<span class="string">":"</span></span><br><span class="line">                    +rpcContext.getRpcRequest().getMethodName()</span><br><span class="line">                    +<span class="string">" 's RT is "</span></span><br><span class="line">                    +rt);</span><br><span class="line">        &#125;<span class="keyword">else</span>&#123;</span><br><span class="line">            logger.error(rpcContext.getRpcRequest().getClassName()</span><br><span class="line">                    +<span class="string">":"</span></span><br><span class="line">                    +rpcContext.getRpcRequest().getMethodName()</span><br><span class="line">                    +<span class="string">"has no start time!"</span>);</span><br><span class="line">        &#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">//这里就是统一处理异常的方法，区分为普通异常和拒绝异常，</span></span><br><span class="line"><span class="comment">//如果是拒绝异常，说明线程已满，拒绝添加任务，reject+1</span></span><br><span class="line"><span class="meta">@Override</span></span><br><span class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">caughtException</span><span class="params">(Object obj)</span> </span>&#123;</span><br><span class="line">    paladinMetric.addException(<span class="number">1</span>);</span><br><span class="line">    <span class="keyword">if</span>(obj <span class="keyword">instanceof</span> RejectedExecutionException)&#123;</span><br><span class="line">        paladinMetric.addReject(<span class="number">1</span>);</span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>每个Context都会继承AbstractContext，只需要实现handle、response和caughtException方法即可，由AbstractContext屏蔽了底层pipeline的顺序调用。</p>
+<h2 id="线程分配"><a href="#线程分配" class="headerlink" title="线程分配"></a>线程分配</h2><p>最后就是如何动态的将线程分配给服务。在这里，我们需要抽象一个评价模型，去评估各个服务应该占用多少资源（线程），可以参考下图：</p>
+<p><img src="https://i.loli.net/2020/07/20/tImkD3vepbKxTrM.jpg" alt="线程动态分配.jpg"></p>
+<p>简单来说，由于监控节点的存在，我们很容易就拿到每个服务的流量数据，然后抽象出每一个服务的评价模型，最后通过某种策略，得到线程分配的结果。</p>
+<p>同时服务-线程的对应关系的读写，显然是一个读多写少的场景。可以后台开启一个线程，每隔一段时间（比如20s），执行一次动态分配的策略。采用CopyOnWrite的思想，将对应关系的引用用volatile修饰，线程重新分配完成之后，直接替换掉其引用即可，这样对性能的影响便没有那么大了。</p>
+<p>这里的问题在于，如何合理的制定分配的策略。由于我实在缺乏相应的经验，所以写的比较捞，希望有大佬可以指点一二。</p>
+<h1 id="效果如何？"><a href="#效果如何？" class="headerlink" title="效果如何？"></a>效果如何？</h1><p>说了这么多，那我们便来看看效果如何。代码我都放在了<a href="https://github.com/KArthurL/paladin" target="_blank" rel="noopener">github</a>上（由于时间比较短再加上本人菜，写得比较粗糙，请大家见谅T T），代码样例都在paladin-demo模块中，这里我就直接上结果了。</p>
+<p>先定义一下参数，线程数总共20，每个服务最少能分配线程数为5，每条线程的阻塞队列容量为4，服务端两个服务，一个阻塞时间长，另一个无阻塞。</p>
+<p>这里先定义一个阻塞时间长的服务HelloWorld。</p>
+<p><img src="https://i.loli.net/2020/07/20/FxdUV71Q4IeaRWi.jpg" alt="阻塞服务"></p>
+<p>然后我们通过http请求触发任务，模拟大流量请求。</p>
+<p><img src="https://i.loli.net/2020/07/20/5NYSZusm8TnWIzV.jpg" alt="阻塞的.jpg"></p>
+<p>同时给出一个无阻塞的服务HelloPaladin，可以通过http访问。</p>
+<p><img src="https://i.loli.net/2020/07/20/SQb6O329W7P1Gse.jpg" alt="正常服务.jpg"></p>
+<p>先后启动服务服务提供端和消费端，开启任务。控制台直接炸裂。<br><img src="https://i.loli.net/2020/07/20/i56zMZyYHmUr7Gk.jpg" alt="报错.jpg"></p>
+<p>服务疯狂抛出拒绝异常。我们再输入<a href="http://localhost:8080/helloPaladin?value=lalala，多点几次，可以发现页面很快就能返回结果，这也意味着这个服务并没有被干扰。" target="_blank" rel="noopener">http://localhost:8080/helloPaladin?value=lalala，多点几次，可以发现页面很快就能返回结果，这也意味着这个服务并没有被干扰。</a></p>
+<p>最后我们来看一下，在任务启动后，线程分配的情况如何：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">22</span>:<span class="number">15</span>:<span class="number">06</span>,<span class="number">653</span>  INFO PaladinMonitor:<span class="number">81</span> - totalScore: <span class="number">594807</span></span><br><span class="line"><span class="number">22</span>:<span class="number">15</span>:<span class="number">06</span>,<span class="number">653</span>  INFO PaladinMonitor:<span class="number">91</span> - service: com.lcf.HelloPaladin:<span class="number">1.0</span><span class="number">.0</span>_paladin, score: <span class="number">1646</span></span><br><span class="line"><span class="number">22</span>:<span class="number">15</span>:<span class="number">06</span>,<span class="number">653</span>  INFO PaladinMonitor:<span class="number">91</span> - service: com.lcf.HelloWorld:<span class="number">1.0</span><span class="number">.0</span>_paladin, score: <span class="number">593161</span></span><br><span class="line"><span class="number">22</span>:<span class="number">15</span>:<span class="number">06</span>,<span class="number">654</span>  INFO PaladinMonitor:<span class="number">113</span> - Threads re-distribution result: &#123;com.lcf.HelloPaladin:<span class="number">1.0</span><span class="number">.0</span>_paladin=[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>, <span class="number">4</span>, <span class="number">5</span>], com.lcf.HelloWorld:<span class="number">1.0</span><span class="number">.0</span>_paladin=[<span class="number">6</span>, <span class="number">7</span>, <span class="number">8</span>, <span class="number">9</span>, <span class="number">10</span>, <span class="number">11</span>, <span class="number">12</span>, <span class="number">13</span>, <span class="number">14</span>, <span class="number">15</span>, <span class="number">16</span>, <span class="number">17</span>, <span class="number">18</span>, <span class="number">19</span>]&#125;</span><br></pre></td></tr></table></figure>
+<p>第一行输出的是所有服务总共的分数，接下来两行分别是两个服务所得到的分数，最后一行是线程分配之后的结果。</p>
+<p>我们穿插调用的HelloPaladin服务得到的分数远远低于跑任务的服务HelloWorld，但是由于设置了最小线程数，所以HelloPaladin服务分到了5条线程，而HelloWorld服务占据了其余的线程。（这里由于还开启了一个单线程服务，所以没有0号线程，至于什么是单线程服务可以看后文）</p>
+<p>可以看到，服务间的线程资源确实隔离了，某一个服务的不可用不会影响到其他服务，同时资源也会向大流量的服务倾斜。</p>
+<h1 id="更花哨的玩法"><a href="#更花哨的玩法" class="headerlink" title="更花哨的玩法"></a>更花哨的玩法</h1><p>在实现上面的功能之后，或许还有更加花哨的玩法。考虑这样一个场景，如果某个服务存在频繁加锁的场景，那么多个线程并发加锁执行，未必会有单个线程串行无锁执行来的效率高，毕竟锁和线程切换的开销也不容忽视。</p>
+<p>在实现了服务与线程的对应关系之后，这种串行无锁执行的思路就很容易实现了，在初始化的时候，直接分配给这个服务固定的线程id号即可，这个线程也不会参与后续的动态分配流程。可以通过注解参数的方式来实现：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">@RpcService</span>(type = RpcConstans.SINGLE)</span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">HelloSynWorldImpl</span> <span class="keyword">implements</span> <span class="title">HelloSynWorld</span></span></span><br></pre></td></tr></table></figure>
+<p>就是这么简单，服务器启动之后你就会发现，这个服务都会使用某条固定的线程去执行，自然也就用不着加锁了（除非要跟其他服务同时操作共享资源，那就不适用于这种场景），不过这种串行场景我想了想，好像并不多，只有在那种纯内存的操作中可能会比较有性能优势（是不是很像Redis），所以也就图一乐。</p>
+<h1 id="相比原来的线程模型有何优劣？"><a href="#相比原来的线程模型有何优劣？" class="headerlink" title="相比原来的线程模型有何优劣？"></a>相比原来的线程模型有何优劣？</h1><p>话又说回来了，虽然解决了服务资源隔离和分配的问题，那么相比原来的线程模型是否就没有劣势了呢？</p>
+<p>因为加入了更多的组件，考虑到监控节点的性能损耗，增加了分配线程、选择线程的逻辑，或许在性能上相比原来的线程模型会差一点，至于差多少，我可能也没法定量给出解答，还需要进一步的测试。不过可以肯定的是，可以通过更多的优化，使得两者的性能更加接近，例如：用JcTool的无锁队列替换JDK中的阻塞队列；给出合适的评价模型，使得资源分配更合理以及分配过程性能更优等等。</p>
+<p>当然最关键的还是你业务代码写的咋样，毕竟框架优化的再好，业务代码不大行，那点优化效果微乎其微。</p>
+<h1 id="后记"><a href="#后记" class="headerlink" title="后记"></a>后记</h1><p>这一次的经历，对我自己而言收获颇丰，不仅仅是因为学到了RPC框架的一些实现原理，更是对于“学习-发现问题-思考解决方案-实践验证”这一整条路的尝试。至于下一步，或许想要尝试在一些开源框架中去实现这个东西吧，毕竟开源这个事，想想就很cool～虽然未必能得到认可，但是实践本身也是学习的一部分，而且并不是足够强了才去参与开源，而是参与开源了才会越来越强。</p>
+
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+        <div class="declare">
+          <ul class="post-copyright">
+            <li>
+              <i class="ri-copyright-line"></i>
+              <strong>版权声明： </strong s>
+              本博客所有文章除特别声明外，均采用 <a href="https://www.apache.org/licenses/LICENSE-2.0.html" rel="external nofollow"
+                target="_blank">Apache License 2.0</a> 许可协议。转载请注明出处！
+            </li>
+          </ul>
+        </div>
+        
+    <footer class="article-footer">
+      
+          
+<div class="share-btn">
+      <span class="share-sns share-outer">
+        <i class="ri-share-forward-line"></i>
+        分享
+      </span>
+      <div class="share-wrap">
+        <i class="arrow"></i>
+        <div class="share-icons">
+          
+          <a class="weibo share-sns" href="javascript:;" data-type="weibo">
+            <i class="ri-weibo-fill"></i>
+          </a>
+          <a class="weixin share-sns wxFab" href="javascript:;" data-type="weixin">
+            <i class="ri-wechat-fill"></i>
+          </a>
+          <a class="qq share-sns" href="javascript:;" data-type="qq">
+            <i class="ri-qq-fill"></i>
+          </a>
+          <a class="douban share-sns" href="javascript:;" data-type="douban">
+            <i class="ri-douban-line"></i>
+          </a>
+          <!-- <a class="qzone share-sns" href="javascript:;" data-type="qzone">
+            <i class="icon icon-qzone"></i>
+          </a> -->
+          
+          <a class="facebook share-sns" href="javascript:;" data-type="facebook">
+            <i class="ri-facebook-circle-fill"></i>
+          </a>
+          <a class="twitter share-sns" href="javascript:;" data-type="twitter">
+            <i class="ri-twitter-fill"></i>
+          </a>
+          <a class="google share-sns" href="javascript:;" data-type="google">
+            <i class="ri-google-fill"></i>
+          </a>
+        </div>
+      </div>
+</div>
+
+<div class="wx-share-modal">
+    <a class="modal-close" href="javascript:;"><i class="ri-close-circle-line"></i></a>
+    <p>扫一扫，分享到微信</p>
+    <div class="wx-qrcode">
+      <img src="//api.qrserver.com/v1/create-qr-code/?size=150x150&data=http://yoursite.com/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/" alt="微信分享二维码">
+    </div>
+</div>
+
+<div id="share-mask"></div>
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/RPC/" rel="tag">RPC</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li></ul>
+
+
+    </footer>
+
+  </div>
+
+  
+  
+  <nav class="article-nav">
+    
+    
+      <a href="/2020/04/17/%E6%98%A5%E6%8B%9B%E5%AE%9E%E4%B9%A0%E4%B9%8B%E6%97%85/" class="article-nav-link">
+        <strong class="article-nav-caption">下一篇</strong>
+        <div class="article-nav-title">春招实习之旅</div>
+      </a>
+    
+  </nav>
+
+
+  
+
+  
+  
+<!-- valine评论 -->
+<div id="vcomments-box">
+    <div id="vcomments">
+    </div>
+</div>
+<script src="//cdn1.lncld.net/static/js/3.0.4/av-min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/valine@1.3.10/dist/Valine.min.js'></script>
+<script>
+    new Valine({
+        el: '#vcomments',
+        app_id: '',
+        app_key: '',
+        path: window.location.pathname,
+        notify: 'false',
+        verify: 'false',
+        avatar: 'mp',
+        placeholder: '给我的文章加点评论吧~',
+        recordIP: true
+    });
+    const infoEle = document.querySelector('#vcomments .info');
+    if (infoEle && infoEle.childNodes && infoEle.childNodes.length > 0) {
+        infoEle.childNodes.forEach(function (item) {
+            item.parentNode.removeChild(item);
+        });
+    }
+</script>
+<style>
+    #vcomments-box {
+        padding: 5px 30px;
+    }
+
+    @media screen and (max-width: 800px) {
+        #vcomments-box {
+            padding: 5px 0px;
+        }
+    }
+
+    #vcomments-box #vcomments {
+        background-color: #fff;
+    }
+
+    .v .vlist .vcard .vh {
+        padding-right: 20px;
+    }
+
+    .v .vlist .vcard {
+        padding-left: 10px;
+    }
+</style>
+
+  
+
+  
+  
+  
+
+</article>
+</section>
+      <footer class="footer">
+  <div class="outer">
+    <ul class="list-inline">
+      <li>
+        &copy;
+        2020
+        Karthur
+      </li>
+      <li>
+        
+      </li>
+    </ul>
+    <ul class="list-inline">
+      <li>
+        
+        
+        <span>
+  <i>PV:<span id="busuanzi_value_page_pv"></span></i>
+  <i>UV:<span id="busuanzi_value_site_uv"></span></i>
+</span>
+        
+      </li>
+      
+      <li>
+        <!-- cnzz统计 -->
+        
+        <script type="text/javascript" src='https://s9.cnzz.com/z_stat.php?id=1278069914&amp;web_id=1278069914'></script>
+        
+      </li>
+    </ul>
+  </div>
+</footer>
+      <div class="to_top">
+        <div class="totop" id="totop">
+  <i class="ri-arrow-up-line"></i>
+</div>
+      </div>
+    </main>
+    <aside class="sidebar">
+      <button class="navbar-toggle"></button>
+<nav class="navbar">
+  
+  <div class="logo">
+    <a href="/"><img src="/images/ayer-side.svg" alt="愿那颗星星一直指引你"></a>
+  </div>
+  
+  <ul class="nav nav-main">
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/">主页</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/archives">归档</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/categories">分类</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/tags">标签</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="/about">关于我</a>
+    </li>
+    
+    <li class="nav-item">
+      <a class="nav-item-link" href="https://github.com/KArthurL" target="_blank" rel="noopener">github</a>
+    </li>
+    
+  </ul>
+</nav>
+<nav class="navbar navbar-bottom">
+  <ul class="nav">
+    <li class="nav-item">
+      
+      <a class="nav-item-link nav-item-search"  title="Search">
+        <i class="ri-search-line"></i>
+      </a>
+      
+      
+      <a class="nav-item-link" target="_blank" href="/atom.xml" title="RSS Feed">
+        <i class="ri-rss-line"></i>
+      </a>
+      
+    </li>
+  </ul>
+</nav>
+<div class="search-form-wrap">
+  <div class="local-search local-search-plugin">
+  <input type="search" id="local-search-input" class="local-search-input" placeholder="Search...">
+  <div id="local-search-result" class="local-search-result"></div>
+</div>
+</div>
+    </aside>
+    <div id="mask"></div>
+
+<!-- #reward -->
+<div id="reward">
+  <span class="close"><i class="ri-close-line"></i></span>
+  <p class="reward-p"><i class="ri-cup-line"></i>请我喝杯咖啡吧~</p>
+  <div class="reward-box">
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/alipay.jpg">
+      <span class="reward-type">支付宝</span>
+    </div>
+    
+    
+    <div class="reward-item">
+      <img class="reward-img" src="/images/wechat.jpg">
+      <span class="reward-type">微信</span>
+    </div>
+    
+  </div>
+</div>
+    
+<script src="/js/jquery-2.0.3.min.js"></script>
+
+
+<script src="/js/jquery.justifiedGallery.min.js"></script>
+
+
+<script src="/js/lazyload.min.js"></script>
+
+
+<script src="/js/busuanzi-2.3.pure.min.js"></script>
+
+
+<script src="/js/share.js"></script>
+
+
+
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script>
+  try {
+    var typed = new Typed("#subtitle", {
+    strings: ['一闪一闪亮晶晶','满天都是小星星','海上生明月，天涯共此时'],
+    startDelay: 0,
+    typeSpeed: 200,
+    loop: true,
+    backSpeed: 100,
+    showCursor: true
+    });
+  } catch (err) {
+  }
+  
+</script>
+
+
+
+
+<script src="/js/tocbot.min.js"></script>
+
+<script>
+  // Tocbot_v4.7.0  http://tscanlin.github.io/tocbot/
+  tocbot.init({
+    tocSelector: '.tocbot',
+    contentSelector: '.article-entry',
+    headingSelector: 'h1, h2, h3, h4, h5, h6',
+    hasInnerContainers: true,
+    scrollSmooth: true,
+    scrollContainer:'main',
+    positionFixedSelector: '.tocbot',
+    positionFixedClass: 'is-position-fixed',
+    fixedSidebarOffset: 'auto',
+    onClick: (e) => {
+      $('.toc-link').removeClass('is-active-link');
+      $(`a[href=${e.target.hash}]`).addClass('is-active-link');
+      $(e.target.hash).scrollIntoView();
+      return false;
+    }
+  });
+</script>
+
+
+<script>
+  var ayerConfig = {
+    mathjax: false
+  }
+</script>
+
+
+<script src="/js/ayer.js"></script>
+
+
+<script src="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-modal@0.9.2/jquery.modal.min.css">
+
+
+<!-- Root element of PhotoSwipe. Must have class pswp. -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+
+    <!-- Background of PhotoSwipe. 
+         It's a separate element as animating opacity is faster than rgba(). -->
+    <div class="pswp__bg"></div>
+
+    <!-- Slides wrapper with overflow:hidden. -->
+    <div class="pswp__scroll-wrap">
+
+        <!-- Container that holds slides. 
+            PhotoSwipe keeps only 3 of them in the DOM to save memory.
+            Don't modify these 3 pswp__item elements, data is added later on. -->
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+
+        <!-- Default (PhotoSwipeUI_Default) interface on top of sliding area. Can be changed. -->
+        <div class="pswp__ui pswp__ui--hidden">
+
+            <div class="pswp__top-bar">
+
+                <!--  Controls are self-explanatory. Order can be changed. -->
+
+                <div class="pswp__counter"></div>
+
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+
+                <button class="pswp__button pswp__button--share" style="display:none" title="Share"></button>
+
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+
+                <!-- Preloader demo http://codepen.io/dimsemenov/pen/yyBWoR -->
+                <!-- element will get class pswp__preloader--active when preloader is running -->
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)">
+            </button>
+
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)">
+            </button>
+
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/default-skin/default-skin.css">
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/photoswipe@4.1.3/dist/photoswipe-ui-default.min.js"></script>
+
+<script>
+    function viewer_init() {
+        let pswpElement = document.querySelectorAll('.pswp')[0];
+        let $imgArr = document.querySelectorAll(('.article-entry img:not(.reward-img)'))
+
+        $imgArr.forEach(($em, i) => {
+            $em.onclick = () => {
+                // slider展开状态
+                // todo: 这样不好，后面改成状态
+                if (document.querySelector('.left-col.show')) return
+                let items = []
+                $imgArr.forEach(($em2, i2) => {
+                    let img = $em2.getAttribute('data-idx', i2)
+                    let src = $em2.getAttribute('data-target') || $em2.getAttribute('src')
+                    let title = $em2.getAttribute('alt')
+                    // 获得原图尺寸
+                    const image = new Image()
+                    image.src = src
+                    items.push({
+                        src: src,
+                        w: image.width || $em2.width,
+                        h: image.height || $em2.height,
+                        title: title
+                    })
+                })
+                var gallery = new PhotoSwipe(pswpElement, PhotoSwipeUI_Default, items, {
+                    index: parseInt(i)
+                });
+                gallery.init()
+            }
+        })
+    }
+    viewer_init()
+</script>
+
+
+
+
+<script type="text/javascript" src="https://js.users.51.la/20544303.js"></script>
+
+    
+  </div>
+</body>
+
+</html>

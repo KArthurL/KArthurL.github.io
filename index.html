@@ -136,6 +136,7 @@
 <li><a href="https://www.mybulinbulin.cn/2020/03/06/Netty%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%E4%B9%8B%E6%9C%8D%E5%8A%A1%E7%AB%AF%E5%88%9B%E5%BB%BA/" target="_blank" rel="noopener">Netty源码解析之服务端创建</a></li>
 <li><a href="https://www.mybulinbulin.cn/2020/03/09/Netty%E6%BA%90%E7%A0%81%E8%A7%A3%E6%9E%90%E4%B9%8B%E7%BA%BF%E7%A8%8B%E6%B1%A0/" target="_blank" rel="noopener">Netty源码解析之线程池</a></li>
 <li><a href="https://www.mybulinbulin.cn/2020/04/05/Netty%E4%B8%AD%E7%9A%84FastThreadLocal" target="_blank" rel="noopener">Netty中的FastThreadLocal</a></li>
+<li><a href="https://www.mybulinbulin.cn/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/" target="_blank" rel="noopener">服务线程隔离的RPC框架</a></li>
 </ol>
 <h1 id="规范"><a href="#规范" class="headerlink" title="规范"></a>规范</h1><ol>
 <li><a href="https://www.mybulinbulin.cn/2020/02/12/%E4%B8%BA%E4%BB%80%E4%B9%88%E9%98%BF%E9%87%8C%E5%B7%B4%E5%B7%B4%E6%89%8B%E5%86%8C%E4%B8%AD%E7%A6%81%E7%94%A8%E9%BB%98%E8%AE%A4%E5%AE%9E%E7%8E%B0%E7%9A%84%E7%BA%BF%E7%A8%8B%E6%B1%A0/" target="_blank" rel="noopener">为什么阿里巴巴手册中禁用默认实现的线程池</a></li>
@@ -159,6 +160,83 @@
     <footer class="article-footer">
       
       
+
+    </footer>
+
+  </div>
+
+  
+
+  
+  
+  
+
+  
+
+</article>
+    
+    <article id="post-服务线程隔离的RPC框架" class="article article-type-post" itemscope
+  itemprop="blogPost" data-scroll-reveal>
+
+  <div class="article-inner">
+    
+    <header class="article-header">
+       
+<h2 itemprop="name">
+  <a class="article-title" href="/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/"
+    >服务线程隔离的RPC框架</a
+  >
+</h2>
+  
+
+    </header>
+    
+
+    
+    <div class="article-meta">
+      <a href="/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/" class="article-date">
+  <time datetime="2020-07-19T15:49:06.000Z" itemprop="datePublished">2020-07-19</time>
+</a>
+      
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E6%A1%86%E6%9E%B6/">框架</a>
+  </div>
+
+      
+      
+      
+    </div>
+    
+
+    
+
+    
+    <div class="article-entry" itemprop="articleBody">
+      
+
+
+      
+
+      
+      <p>自从春招实习之后，眼界真的就一下子开阔起来了，也感觉到了以前的自己好菜啊（虽然现在也是，笑～）。果然学习之路不能停！</p>
+<p>微服务如今应当是一个优秀的程序员必须学习的一种架构思想，而RPC框架作为微服务的核心，不说读一遍源码吧，起码它的实现原理还是应该知道的。</p>
+<p>然而目前的RPC服务框架，大多存在一个问题，就是当服务提供端Provider应用中，有的服务流量大，耗时长，导致线程池资源被这些服务占尽，从而影响同一应用中的其他服务正常提供。为此，这次博文主要介绍一下我对于这方面的思考。</p>
+      
+      <a class="article-more-link" href="/2020/07/19/%E6%9C%8D%E5%8A%A1%E7%BA%BF%E7%A8%8B%E9%9A%94%E7%A6%BB%E7%9A%84RPC%E6%A1%86%E6%9E%B6/">阅读更多...</a>
+      
+      
+      <!-- reward -->
+      
+    </div>
+    
+    
+      <!-- copyright -->
+      
+    <footer class="article-footer">
+      
+      
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/RPC/" rel="tag">RPC</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li></ul>
+
 
     </footer>
 
@@ -763,82 +841,6 @@
       
       
   <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/Netty/" rel="tag">Netty</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E7%BD%91%E7%BB%9C%E7%BC%96%E7%A8%8B/" rel="tag">网络编程</a></li></ul>
-
-
-    </footer>
-
-  </div>
-
-  
-
-  
-  
-  
-
-  
-
-</article>
-    
-    <article id="post-NIO中的堆外内存" class="article article-type-post" itemscope
-  itemprop="blogPost" data-scroll-reveal>
-
-  <div class="article-inner">
-    
-    <header class="article-header">
-       
-<h2 itemprop="name">
-  <a class="article-title" href="/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/"
-    >NIO中的堆外内存回收——虚引用</a
-  >
-</h2>
-  
-
-    </header>
-    
-
-    
-    <div class="article-meta">
-      <a href="/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/" class="article-date">
-  <time datetime="2020-02-20T15:07:28.000Z" itemprop="datePublished">2020-02-20</time>
-</a>
-      
-  <div class="article-category">
-    <a class="article-category-link" href="/categories/JVM/">JVM</a>
-  </div>
-
-      
-      
-      
-    </div>
-    
-
-    
-
-    
-    <div class="article-entry" itemprop="articleBody">
-      
-
-
-      
-
-      
-      <p>在学习《深入理解Java虚拟机》一书中，我们知道NIO是可以直接使用系统内存（DirectByteBuffer）。而我们知道JVM垃圾回收是无法回收系统的直接内存的，那这块内存用过之后是如何释放的？</p>
-<p>当然肯定不需要我们像C++那样手动释放，这里就要引出Java中最弱的一个引用了——虚引用……</p>
-      
-      <a class="article-more-link" href="/2020/02/20/NIO%E4%B8%AD%E7%9A%84%E5%A0%86%E5%A4%96%E5%86%85%E5%AD%98/">阅读更多...</a>
-      
-      
-      <!-- reward -->
-      
-    </div>
-    
-    
-      <!-- copyright -->
-      
-    <footer class="article-footer">
-      
-      
-  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/IO/" rel="tag">IO</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E5%8E%9F%E5%88%9B/" rel="tag">原创</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%BA%90%E7%A0%81/" rel="tag">源码</a></li></ul>
 
 
     </footer>
